@@ -34,6 +34,37 @@ dialog{width:min(440px,calc(100% - 28px));padding:0;border:1px solid var(--line)
 @keyframes arrive{from{opacity:.6;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:780px){main{padding:15px}.community-layout{grid-template-columns:1fr}.fan-intro{padding:20px}.fan-intro:after{right:5%;font-size:115px}.side-stack{grid-template-columns:repeat(2,minmax(0,1fr))}.side-stack .game-card{grid-column:1/-1}}
 @media(max-width:520px){main{padding:11px}.masthead{align-items:flex-start}.account{gap:7px;flex-direction:column;align-items:flex-end}.account .btn{padding:7px 10px}.fan-intro{align-items:flex-start;flex-direction:column}.fan-intro h1{font-size:1.7rem}.room-count{text-align:left}.chat-head{padding:13px}.chat-compose{padding:11px}.compose-row{align-items:stretch;flex-direction:column}.compose-actions{justify-content:space-between}.attach-btn{flex:1}.side-stack{grid-template-columns:1fr}.side-stack .game-card{grid-column:auto}.auth-brand h1{font-size:1.4rem}}
+body{background:radial-gradient(ellipse at top left,#fff4df 0,transparent 36%),radial-gradient(ellipse at top right,#dceef2 0,transparent 32%),var(--paper)}
+.card{border-radius:16px;box-shadow:0 8px 24px #17383b0b;padding:20px}
+.chip{border-radius:999px;padding:9px 14px}
+.chip:hover,.attach-btn:hover{transform:translateY(-1px);box-shadow:0 5px 14px #145b621c}
+.btn{border-radius:999px;box-shadow:0 5px 14px #e6534325}
+.btn.alt{box-shadow:none}
+.fan-intro{border-radius:20px;background:linear-gradient(125deg,#145b62,#247c75 65%,#438879);box-shadow:0 12px 32px #145b6226}
+#fanRoom{border-radius:18px}
+.game-card,.show-card,.mode-card,.leader-card{border:1px solid #fff9}
+.quiz-panel{max-width:850px;margin:18px auto;padding:clamp(18px,4vw,34px);border:1px solid #dce4df;border-radius:22px;background:linear-gradient(145deg,#fff,#f5fbf8);box-shadow:0 14px 38px #17383b12}
+.quiz-progress{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--teal);font-weight:700}
+.quiz-question{font-size:clamp(1.2rem,3vw,1.75rem);line-height:1.35;margin:14px 0 20px}
+.quiz-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.quiz-option{min-height:58px;padding:13px 15px;text-align:left;border:1px solid #cbded8;border-radius:13px;background:#fff;cursor:pointer;transition:.15s}
+.quiz-option:hover:not(:disabled){border-color:var(--teal);background:var(--teal-soft);transform:translateY(-1px)}
+.quiz-option:disabled{cursor:default;opacity:.9}
+.quiz-option.correct{border-color:#39885d;background:#e7f5e8;color:#1d623b}
+.quiz-option.incorrect{border-color:#d16c5a;background:#fff0e8;color:#923e32}
+.quiz-option.selected{outline:2px solid var(--teal)}
+.quiz-status{min-height:26px;margin:13px 0;color:var(--muted)}
+.quiz-scoreboard{display:grid;gap:7px;margin:20px 0}
+.quiz-score-row{display:flex;justify-content:space-between;gap:12px;padding:9px 12px;border-radius:10px;background:#edf5f1}
+.deleted-notice{grid-column:1/-1;margin:3px auto;padding:7px 13px;border:1px dashed #c6d0cd;border-radius:999px;background:#f0f3f1;color:var(--muted);font-size:12px;text-align:center}
+.media-preview{display:flex;gap:9px;flex-wrap:wrap;padding:10px 0}
+.media-preview-item{position:relative;width:86px;height:76px;overflow:hidden;border:2px solid #dce4df;border-radius:12px;background:#e8eeeb}
+.media-preview-item img,.media-preview-item video{width:100%;height:100%;object-fit:cover}
+.media-preview-remove{position:absolute;top:3px;right:3px;width:24px;height:24px;border:0;border-radius:50%;background:#17282dd9;color:#fff;cursor:pointer}
+.community-layout,.side-stack{min-width:0}
+input,select,textarea{min-width:0;border-radius:10px}
+.masthead{border-bottom-color:#cfddd7}
+@media(max-width:600px){.quiz-options{grid-template-columns:1fr}.quiz-option{min-height:52px}.quiz-panel{border-radius:16px;padding:18px}.quiz-score-row{font-size:13px}.card{padding:16px}}
 </style></head><body><main>
 
 <div id="auth">
@@ -56,12 +87,12 @@ dialog{width:min(440px,calc(100% - 28px));padding:0;border:1px solid var(--line)
     <section class="card" id="fanRoom" aria-label="Public fans chat">
       <div class="chat-head"><div class="chat-title"><span class="chat-badge">KP</span><div><h2>Karan Patel Fans</h2><p class="small">Public community conversation</p></div></div><button class="text-btn" id="adminOpen" type="button">Moderator</button></div>
       <div id="fanMessages" aria-live="polite"><div class="empty-chat"><strong>Room is warming up</strong>Start the conversation with the fans.</div></div>
-      <form class="chat-compose" id="fanForm"><textarea id="fanText" maxlength="4000" placeholder="Write a message or paste a link..." aria-label="Message"></textarea><div class="compose-row"><div class="file-note" id="fileNote">Attach up to 5 photos/videos to one message</div><div class="compose-actions"><input class="hide" id="fanFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,video/ogg" multiple><button class="attach-btn" id="attachMedia" type="button">Add media</button><button class="btn" type="submit" id="fanSend">Send</button></div></div><div class="chat-status" id="fanStatus" role="status"></div></form>
+      <form class="chat-compose" id="fanForm"><textarea id="fanText" maxlength="4000" placeholder="Write a message or paste a link..." aria-label="Message"></textarea><div class="compose-row"><div class="file-note" id="fileNote">Attach up to 5 photos/videos to one message</div><div class="compose-actions"><input class="hide" id="fanFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,video/ogg" multiple><button class="attach-btn" id="attachMedia" type="button">Add media</button><button class="btn" type="submit" id="fanSend">Send</button></div></div><div class="media-preview" id="mediaPreview"></div><div class="chat-status" id="fanStatus" role="status"></div></form>
     </section>
     <aside class="side-stack">
       <section class="card mode-card"><div class="section-title"><h2>Play together</h2><span class="tag">Role-play</span></div><div class="opts" id="modes"></div></section>
       <section class="card show-card" id="showBox"><h2>Choose a show</h2><div class="opts" id="shows"></div><input id="showCustom" placeholder="Or type another show / project"></section>
-      <section class="card game-card"><h2 id="charH">Your character</h2><input id="char" placeholder="e.g. Raman Bhalla, Mr. Bajaj..."><h2>Language</h2><input id="lang" value="Hinglish" placeholder="Hindi, Hinglish, English..."><h2>Game length</h2><select id="mins"><option>2</option><option selected>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select><p class="row" style="margin-top:12px"><button class="btn" id="solo">Play solo</button><button class="btn alt" id="host">Host a game</button></p><div class="small" id="err" style="color:#a83327"></div></section>
+      <section class="card game-card"><div id="roleBox"><h2 id="charH">Character you will play</h2><input id="char" placeholder="Enter the character you want to play"><p class="small">Your account name is shown separately; type the show character you want to portray.</p></div><h2>Language</h2><input id="lang" value="Hinglish" placeholder="Hindi, Hinglish, English..."><div id="lengthBox"><h2>Role-play length</h2><select id="mins"><option>2</option><option selected>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select></div><div id="questionCountBox" class="hide"><h2>Number of quiz questions</h2><select id="questionCount"><option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select><p class="small">Every question has four options. No game timer.</p></div><p class="row" style="margin-top:12px"><button class="btn" id="solo">Play solo</button><button class="btn alt" id="host">Host a game</button></p><div class="small" id="err" style="color:#a83327"></div></section>
       <section class="card"><h2>Join a game</h2><div class="row"><input id="code" placeholder="Game ID"><button class="btn alt" id="joinc">Join</button></div><h2 style="margin-top:18px">Open games</h2><div id="open" class="small">None right now.</div></section>
       <section class="card leader-card"><h2>Top players</h2><div id="board" class="small">No wins yet.</div></section>
       <section class="card warn"><b>Fan-made game.</b> Not affiliated with or endorsed by Karan Patel or his team. AI replies and scores may be inaccurate and do not represent any real person's words or opinions.</section>
@@ -80,9 +111,8 @@ dialog{width:min(440px,calc(100% - 28px));padding:0;border:1px solid var(--line)
 
 <div id="play" class="hide">
   <div class="bar"><div><b id="title"></b><div class="small" id="sub"></div></div><div id="timer">00:00</div></div>
-  <div id="chat"></div>
-  <div class="row"><input id="msg" maxlength="500" placeholder="Type your dialogue... use (brackets) for actions"><button class="btn" id="send">Send</button></div>
-  <div class="small">Role-play is text-only; images and videos cannot be sent here.</div>
+  <section id="roleplayArea"><div id="chat"></div><div class="row"><input id="msg" maxlength="500" placeholder="Type your dialogue... use (brackets) for actions"><button class="btn" id="send">Send</button></div><div class="small">Role-play is text-only; images and videos cannot be sent here.</div></section>
+  <section id="quizArea" class="quiz-panel hide"><div class="quiz-progress"><span id="quizCategory"></span><span id="quizProgress"></span></div><h2 class="quiz-question" id="quizQuestion"></h2><div class="quiz-options" id="quizOptions"></div><div class="quiz-status" id="quizStatus" role="status"></div><div id="quizScores" class="quiz-scoreboard"></div><button class="btn hide" id="quizNext" type="button"></button></section>
   <p><button class="btn alt hide" id="end">End game now (host)</button></p>
 </div>
 
@@ -122,11 +152,13 @@ function appendLinks(parent,text){
   parent.append(document.createTextNode(text.slice(cursor)));
 }
 function makeFanPost(post){
+  if(post.deleted){const notice=document.createElement("div");notice.className="deleted-notice";notice.textContent="A message or media item was removed.";notice.dataset.chatId=post.id;return notice}
   const article=document.createElement("article");article.className="fan-message";article.dataset.chatId=post.id;
   const avatar=document.createElement("div");avatar.className="avatar";avatar.textContent=(post.name||"F").slice(0,1).toUpperCase();article.append(avatar);
   const main=document.createElement("div");main.className="message-main";const meta=document.createElement("div");meta.className="message-meta";
   const name=document.createElement("span");name.className="message-name";name.textContent=post.name;
   const time=document.createElement("time");time.className="message-time";time.dateTime=new Date(post.created_at).toISOString();time.textContent=new Date(post.created_at).toLocaleString();meta.append(name,time);
+  if(post.isMine){const del=document.createElement("button");del.className="mini-action";del.textContent="Delete";del.title="Delete your message";del.onclick=()=>deleteOwnPost(post.id);meta.append(del)}
   if(isModerator){
     const tools=document.createElement("div");tools.className="moderation-tools";
     const del=document.createElement("button");del.className="mini-action";del.textContent="Delete";del.title="Delete this message";del.onclick=()=>moderate(`/api/admin/messages/${post.id}`,"DELETE","Delete this message?");tools.append(del);
@@ -152,7 +184,12 @@ async function loadFanChat(force=false){
     [...box.querySelectorAll(".fan-message")].forEach(node=>{if(!ids.has(node.dataset.chatId))node.remove()});
     if(!data.messages.length&&!box.querySelector(".empty-chat")){const empty=document.createElement("div");empty.className="empty-chat";const title=document.createElement("strong");title.textContent="Room is warming up";empty.append(title,document.createTextNode("Start the conversation with the fans."));box.append(empty)}
     else if(data.messages.length)box.querySelector(".empty-chat")?.remove();
-    data.messages.forEach(post=>{if(!box.querySelector(`[data-chat-id="${post.id}"]`))box.append(makeFanPost(post))});
+    data.messages.forEach(post=>{
+      const existing=box.querySelector(`[data-chat-id="${post.id}"]`);
+      if(existing){
+        if(post.deleted&&!existing.classList.contains("deleted-notice"))existing.replaceWith(makeFanPost(post));
+      }else box.append(makeFanPost(post));
+    });
     $("fanCount").textContent=`${data.members} fan${data.members===1?"":"s"} in the room`;if(nearBottom)box.scrollTop=box.scrollHeight;
   }catch{$("fanStatus").textContent="Couldn't load the chat. Retrying..."}
 }
@@ -168,24 +205,53 @@ async function loadBlocked(){
 async function moderate(url,method,question){
   if(!confirm(question))return;const response=await fetch(url,{method});if(!response.ok){const data=await response.json();$("modStatus").textContent=data.error||"Moderation action failed.";return}await loadFanChat(true);await loadBlocked();
 }
+async function deleteOwnPost(id){
+  if(!confirm("Delete your message and its attached media? Others will only see an anonymous removal notice."))return;
+  try{
+    const response=await fetch(`/api/fan-chat/${encodeURIComponent(id)}`,{method:"DELETE"}),data=await response.json();
+    if(!response.ok){$("fanStatus").textContent=data.error||"Could not delete the message.";return}
+    if(data.warning)$("fanStatus").textContent=data.warning;
+    await loadFanChat(true);
+  }catch{$("fanStatus").textContent="Could not delete the message. Check your connection."}
+}
 $("adminOpen").onclick=()=>$("modDialog").showModal();$("modClose").onclick=()=>$("modDialog").close();
 $("modForm").onsubmit=async event=>{event.preventDefault();const response=await fetch("/api/admin/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:$("modPassword").value})}),data=await response.json();if(!response.ok){$("modStatus").textContent=data.error;return}$("modPassword").value="";await refreshModerator()};
 $("modLogout").onclick=async()=>{await fetch("/api/admin/logout",{method:"POST"});isModerator=false;await refreshModerator()};
 $("attachMedia").onclick=()=>$("fanFiles").click();
-$("fanFiles").onchange=()=>{$("fileNote").textContent=$("fanFiles").files.length?`${$("fanFiles").files.length} file${$("fanFiles").files.length===1?"":"s"} selected`:"Attach up to 5 photos/videos to one message"};
+$("fanFiles").onchange=()=>{
+  previews.forEach(URL.revokeObjectURL);previews=[];
+  const files=[...$("fanFiles").files],box=$("mediaPreview");box.replaceChildren();
+  if(files.length>5){
+    const dt=new DataTransfer();files.slice(0,5).forEach(file=>dt.items.add(file));$("fanFiles").files=dt.files;
+    $("fanStatus").textContent="You can attach up to five files per message.";
+    files.splice(5);
+  }
+  $("fileNote").textContent=files.length?`${files.length} file${files.length===1?"":"s"} ready to send`:"Attach up to 5 photos/videos to one message";
+  files.forEach(file=>{
+    const item=document.createElement("div");item.className="media-preview-item";item.title=file.name;
+    const url=URL.createObjectURL(file);previews.push(url);
+    const media=document.createElement(file.type.startsWith("video/")?"video":"img");media.src=url;
+    if(media.tagName==="VIDEO"){media.muted=true;media.playsInline=true;media.preload="metadata"}else media.alt=file.name;
+    const label=document.createElement("span");label.className="hide";label.textContent=file.name;
+    const remove=document.createElement("button");remove.className="media-preview-remove";remove.type="button";remove.textContent="×";remove.setAttribute("aria-label",`Remove ${file.name}`);
+    remove.onclick=()=>{const input=$("fanFiles"),dt=new DataTransfer();[...input.files].forEach(existing=>{if(existing!==file)dt.items.add(existing)});input.files=dt.files;input.dispatchEvent(new Event("change"))};
+    item.append(media,label,remove);box.append(item);
+  });
+};
+let previews=[];
 $("fanForm").onsubmit=async event=>{
   event.preventDefault();$("fanStatus").textContent="";const form=new FormData();form.set("body",$("fanText").value);[...$("fanFiles").files].forEach(file=>form.append("media",file));$("fanSend").disabled=true;
-  try{const response=await fetch("/api/fan-chat",{method:"POST",body:form}),data=await response.json();if(!response.ok){$("fanStatus").textContent=data.error||"Message could not be sent.";return}$("fanText").value="";$("fanFiles").value="";$("fileNote").textContent="Attach up to 5 photos/videos to one message";await loadFanChat(true)}
+  try{const response=await fetch("/api/fan-chat",{method:"POST",body:form}),data=await response.json();if(!response.ok){$("fanStatus").textContent=data.error||"Message could not be sent.";return}$("fanText").value="";$("fanFiles").value="";$("fanFiles").dispatchEvent(new Event("change"));$("fileNote").textContent="Attach up to 5 photos/videos to one message";await loadFanChat(true)}
   catch{$("fanStatus").textContent="Message could not be sent. Check your connection."}
   finally{$("fanSend").disabled=false}
 };
 
 // ---- home ----
 function chips(el,list,cb,sel){el.innerHTML="";list.forEach(([k,v])=>{const b=mk(el,"button",v);b.className="chip"+(k===sel?" on":"");b.onclick=()=>{[...el.children].forEach(c=>c.classList.remove("on"));b.classList.add("on");cb(k)}})}
-chips($("modes"),Object.entries(MODES),k=>{mode=k;$("showBox").classList.toggle("hide",k!=="serial");$("charH").textContent=k==="serial"?"3. Your character":"3. Your name";},"serial");
+chips($("modes"),Object.entries(MODES),k=>{mode=k;$("showBox").classList.toggle("hide",k!=="serial");$("roleBox").classList.toggle("hide",k!=="serial");$("lengthBox").classList.toggle("hide",k!=="serial");$("questionCountBox").classList.toggle("hide",k!=="quiz");},"serial");
 chips($("shows"),SHOWS.map(s=>[s,s]),k=>{show=k;$("showCustom").value=""});
 $("showCustom").oninput=()=>{show=$("showCustom").value;[...$("shows").children].forEach(c=>c.classList.remove("on"))};
-const form=()=>({mode,show:(show||$("showCustom").value).trim(),char:$("char").value.trim(),lang:$("lang").value,mins:+$("mins").value});
+const form=()=>({mode,show:(show||$("showCustom").value).trim(),char:$("char").value.trim(),lang:$("lang").value,mins:+$("mins").value,questionCount:+$("questionCount").value});
 const tx=o=>ws&&ws.readyState===1?ws.send(JSON.stringify(o)):($("err").textContent="Connecting... try again.");
 $("solo").onclick=()=>tx({t:"host",solo:true,...form()});
 $("host").onclick=()=>tx({t:"host",...form()});
@@ -195,32 +261,58 @@ $("joinc").onclick=()=>tx({t:"join",gid:$("code").value.trim().toUpperCase(),cha
 function connect(){
   ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
   ws.onclose=e=>{if(e.code===4001){location.reload();return}setTimeout(()=>me&&connect(),1500)};
-  ws.onmessage=e=>{const m=JSON.parse(e.data);({lobby,game,msg,history,result,err,kicked})[m.t]?.(m)};
+  ws.onmessage=e=>{const m=JSON.parse(e.data);({lobby,game,msg,history,result,err,kicked,joinRequest,requestSent})[m.t]?.(m)};
 }
 function lobby(m){
   const o=$("open");o.innerHTML="";if(!m.list.length)o.textContent="None right now.";
-  m.list.forEach(g=>{const r=mk(o,"div");r.className="row";mk(r,"span",`${g.host} is starting "${g.title}" (${g.mins} min, ${g.n} in) · ID ${g.id}`).style.flex="1";const b=mk(r,"button","Request to join");b.className="btn alt";b.onclick=()=>tx({t:"join",gid:g.id,char:$("char").value.trim()})});
+  m.list.forEach(g=>{const r=mk(o,"div");r.className="row";const details=g.mode==="quiz"?`${g.questionCount} questions`:`${g.mins} min`;mk(r,"span",`${g.host} is starting "${g.title}" (${details}, ${g.n} in) · ID ${g.id}`).style.flex="1";const b=mk(r,"button","Request to join");b.className="btn alt";b.onclick=()=>tx({t:"join",gid:g.id,char:$("char").value.trim()})});
   const bd=$("board");bd.innerHTML="";if(!m.board.length)bd.textContent="No wins yet.";m.board.forEach((u,i)=>mk(bd,"div",`${i+1}. ${u.name} (ID ${u.pub}) — ${u.wins} wins`));
 }
-function err(m){$("err").textContent=m.e;if(!$("home").classList.contains("hide"))window.scrollTo(0,0)}
+function err(m){
+  if(!$("play").classList.contains("hide")&&G?.mode==="quiz")$("quizStatus").textContent=m.e;
+  else if(!$("lobby").classList.contains("hide"))$("lmsg").textContent=m.e;
+  else{$("err").textContent=m.e;if(!$("home").classList.contains("hide"))window.scrollTo(0,0)}
+}
 function kicked(){G=null;screen("home");$("err").textContent="The host did not accept your request, or the game was cancelled."}
+function joinRequest(m){if(G&&G.id===m.gid&&G.host===me.id){$("lmsg").textContent=`New join request: ${m.name} (ID ${m.pub}) wants to play ${m.char}. Accept or reject it below.`;screen("lobby");drawLobby(true)}}
+function requestSent(m){$("err").textContent=`Join request sent to ${m.host}. Waiting for approval.`}
 function game(m){
-  G=m.g;off=G.now-Date.now();const mine=G.players.find(p=>p.uid===undefined)||null;
-  const isHost=me&&G.players.some(p=>p.name===me.name&&p.uid===G.host);
+  G=m.g;off=G.now-Date.now();
+  const isHost=me&&G.host===me.id;
   if(G.status==="lobby"){screen("lobby");drawLobby(isHost)}
-  else if(G.status==="live"){if(shown!==G.id){shown=G.id;$("chat").innerHTML=""}screen("play");$("title").textContent=G.title+(G.solo?"":" · multiplayer");const p=G.players.find(x=>x.name===me.name);$("sub").textContent="You are: "+(p?p.char:"");$("end").classList.toggle("hide",!isHost||G.solo&&false);clearInterval(tId);tick();tId=setInterval(tick,500)}
+  else if(G.status==="live"){screen("play");$("title").textContent=G.title+(G.solo?"":" · multiplayer");const p=G.players.find(x=>x.pub===me.id);$("sub").textContent=`You are: ${p?p.char:""} · ${p?.name||me.name} (ID ${p?.pub||me.id})`;const quiz=G.mode==="quiz";$("roleplayArea").classList.toggle("hide",quiz);$("quizArea").classList.toggle("hide",!quiz);$("timer").classList.toggle("hide",quiz);$("end").classList.toggle("hide",!isHost);clearInterval(tId);if(quiz)drawQuiz(isHost);else{if(shown!==G.id){shown=G.id;$("chat").innerHTML=""}tick();tId=setInterval(tick,500)}}
   else if(G.status==="scoring"){clearInterval(tId);$("timer").textContent="Scoring…";screen("result");$("pct").textContent="…";$("verdict").firstChild.textContent="Judging your performance carefully...";$("fb").innerHTML="";$("topc").classList.add("hide")}
 }
 const fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
 function tick(){const s=Math.max(0,Math.round((G.endsAt-(Date.now()+off))/1000));$("timer").textContent=fmt(s)}
 function drawLobby(isHost){
-  $("gid").textContent=G.id;$("ginfo").textContent=`${G.title} · ${G.mins} min`;
+  $("gid").textContent=G.id;$("ginfo").textContent=G.mode==="quiz"?`${G.title} · ${G.questionCount} questions · No timer`:`${G.title} · ${G.mins} min`;
   const pl=$("plist"),rq=$("rlist");pl.innerHTML="";rq.innerHTML="";
-  G.players.forEach(p=>{if(p.status==="joined")mk(pl,"div",`${p.name} → ${p.char}${p.name===me.name?" (you)":""}`);
-    else if(isHost){const r=mk(rq,"div");r.className="row";mk(r,"span",`${p.name} wants to play ${p.char}`).style.flex="1";const a=mk(r,"button","Accept");a.className="btn";a.onclick=()=>tx({t:"accept",gid:G.id,uid:p.uid});const x=mk(r,"button","Reject");x.className="btn alt";x.onclick=()=>tx({t:"reject",gid:G.id,uid:p.uid})}});
+  G.players.forEach(p=>{if(p.status==="joined")mk(pl,"div",`${p.name} (ID ${p.pub})${G.mode==="serial"?" → "+p.char:""}${p.pub===me.id?" (you)":""}`);
+    else if(isHost){const r=mk(rq,"div");r.className="row";mk(r,"span",`${p.name} (ID ${p.pub}) wants to join${G.mode==="serial"?" as "+p.char:""}`).style.flex="1";const a=mk(r,"button","Accept");a.className="btn";a.onclick=()=>tx({t:"accept",gid:G.id,uid:p.uid});const x=mk(r,"button","Reject");x.className="btn alt";x.onclick=()=>tx({t:"reject",gid:G.id,uid:p.uid})}});
   $("reqs").classList.toggle("hide",!rq.children.length);$("go").classList.toggle("hide",!isHost);
-  const mine=G.players.find(p=>p.name===me.name);
+  const mine=G.players.find(p=>p.pub===me.id);
   $("lmsg").textContent=isHost?"Share the Game ID. Only you can start the game.":mine&&mine.status==="requested"?"Waiting for the host to accept...":"You are in. Waiting for the host to start.";
+}
+function drawQuiz(isHost){
+  const quiz=G.quiz;if(!quiz?.question)return;
+  $("quizCategory").textContent=quiz.question.category;$("quizProgress").textContent=`Question ${quiz.number} of ${quiz.total}`;
+  $("quizQuestion").textContent=quiz.question.text;$("quizOptions").replaceChildren();
+  quiz.question.options.forEach((option,index)=>{
+    const button=mk($("quizOptions"),"button",`${String.fromCharCode(65+index)}. ${option}`);button.className="quiz-option";
+    const chosen=quiz.myChoice===index,correct=quiz.question.correctIndex;
+    if(chosen)button.classList.add("selected");
+    if(quiz.revealed&&index===correct)button.classList.add("correct");
+    if(quiz.revealed&&chosen&&index!==correct)button.classList.add("incorrect");
+    button.disabled=quiz.myChoice!==null||quiz.revealed;
+    button.onclick=()=>{button.disabled=true;$("quizStatus").textContent="Submitting answer…";tx({t:"quizAnswer",gid:G.id,choice:index})};
+  });
+  $("quizStatus").textContent=quiz.revealed?`Correct answer: ${quiz.question.options[quiz.question.correctIndex]}`:quiz.myChoice!==null?"Answer submitted. Waiting for everyone else or the host to reveal the answer.":`${quiz.submitted} answer${quiz.submitted===1?"":"s"} submitted.`;
+  const scores=$("quizScores");scores.replaceChildren();
+  [...quiz.scores].sort((a,b)=>b.correct-a.correct||a.name.localeCompare(b.name)).forEach((player,index)=>{
+    const row=mk(scores,"div");row.className="quiz-score-row";mk(row,"span",`${index+1}. ${player.name} (ID ${player.pub})`);mk(row,"b",`${player.correct}/${quiz.total}`);
+  });
+  const next=$("quizNext");next.classList.toggle("hide",!isHost);next.textContent=quiz.revealed?(quiz.number===quiz.total?"Finish quiz":"Next question"):"Reveal answer";next.onclick=()=>tx({t:"quizNext",gid:G.id});
 }
 $("go").onclick=()=>tx({t:"start",gid:G.id});$("leave").onclick=()=>{tx({t:"leave",gid:G.id});G=null;screen("home")};$("end").onclick=()=>confirm("End the game for everyone and get scores?")&&tx({t:"end",gid:G.id});
 function addMsg(m){const d=mk($("chat"),"div",m.who+": "+m.t);const p=G&&G.players.find(x=>x.name===me.name);d.className="m"+(p&&m.uid&&m.who===p.char?" me":"");$("chat").scrollTop=1e9}

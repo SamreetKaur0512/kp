@@ -14,8 +14,10 @@ AI scoring, leaderboard. Everything runs on the server, so friends only need the
 - Instagram/Reels links open on Instagram. Instagram controls whether a Reel can be embedded elsewhere.
 - Set `ADMIN_PASSWORD` on the server. The Moderator button appears once it is configured; sign in there to delete messages, block members from fan chat, or unblock them.
 - Chat posts and Cloudinary media references are saved in MongoDB. Uploaded photos and videos are stored in Cloudinary, so Render does not need a persistent disk for chat uploads.
+- Members can delete their own posts. Deleted posts remain as anonymous removal notices, and attached Cloudinary media is deleted where possible. Selected photos and videos show local previews before posting.
 - Cloudinary and its account plan enforce upload size, format, and storage limits.
 - Role-play results prioritize how convincingly each player portrayed their selected character, including in-character dialogue, reactions to the scene, and staying in role. The complete transcript is context, but only that player's lines are scored; message quantity alone does not determine the acting score.
+- Choose **Karan Patel Quiz** to host a multiple-choice game with 5, 10, 15, 20, 25, or 30 questions. Share the Game ID; incoming join requests appear in the host lobby. Quizzes have no timer, show answers after reveal, and display a live scoreboard. Serial role-play continues to use a duration and asks each player for their character rather than their account name.
 
 ## Role-play safety and references
 - Role-play is text-only; its server rejects image/video attachments.

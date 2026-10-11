@@ -5,6 +5,7 @@ import { MongoClient, ObjectId } from 'mongodb';
 import { v2 as cloudinary } from 'cloudinary';
 import { createCloudinaryStorage } from './cloudinary-storage.js';
 import { ACTING_CRITERIA, actingJudgePrompt } from './acting-judge.js';
+import { buildQuiz, QUIZ_QUESTION_COUNTS, quizPlayerResult, revealQuizQuestion, submitQuizAnswer } from './quiz-game.js';
 import crypto from 'crypto';
 import http from 'http';
 import path from 'path';
@@ -124,17 +125,22 @@ const signedIn = async (req, res, next) => {
     next();
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not verify your fan chat access.' }); }
 };
-app.get('/api/fan-chat', async (_req, res) => {
+app.get('/api/fan-chat', async (req, res) => {
   try {
     const posts = await FanChat.find({}).sort({ createdAt: -1, _id: -1 }).limit(100).toArray();
-    const userIds = [...new Set(posts.map(post => post.uid))];
+    const viewer = await userBySid(cookie(req, 'sid') || '');
+    const userIds = [...new Set(posts.filter(post => !post.deleted && post.uid != null).map(post => post.uid))];
     const users = await Users.find({ _id: { $in: userIds } }).project({ name: 1 }).toArray();
     const names = new Map(users.map(user => [user._id, user.name]));
-    const messages = posts.reverse().filter(post => names.has(post.uid)).map(post => ({
-      id: post._id.toString(), uid: post.uid, name: names.get(post.uid), body: post.body, created_at: post.createdAt.getTime(),
-      media: (post.media || []).map(file => ({ id: file.id, url: file.url, name: file.name, mime: file.mime })),
-    }));
-    const [{ members = 0 } = {}] = await FanChat.aggregate([{ $group: { _id: '$uid' } }, { $count: 'members' }]).toArray();
+    const messages = posts.reverse().flatMap(post => {
+      if (post.deleted) return [{ id: post._id.toString(), deleted: true, body: post.body, created_at: post.createdAt.getTime(), media: [] }];
+      if (!names.has(post.uid)) return [];
+      return [{
+        id: post._id.toString(), uid: post.uid, isMine: viewer?._id === post.uid, name: names.get(post.uid), body: post.body, created_at: post.createdAt.getTime(),
+        media: (post.media || []).map(file => ({ id: file.id, url: file.url, name: file.name, mime: file.mime })),
+      }];
+    });
+    const [{ members = 0 } = {}] = await FanChat.aggregate([{ $match: { uid: { $exists: true } } }, { $group: { _id: '$uid' } }, { $count: 'members' }]).toArray();
     res.json({ messages, members });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load the fan chat.' }); }
 });
@@ -167,6 +173,28 @@ app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
     console.error(error);
     res.status(500).json({ error: 'Message could not be sent.' });
   }
+});
+async function deleteFanMessage(post, query, res) {
+  const result = await FanChat.updateOne(
+    { _id: post._id, ...query, deleted: { $ne: true } },
+    { $set: { deleted: true, body: 'A message or media item was deleted.', media: [], deletedAt: new Date() }, $unset: { uid: '' } },
+  );
+  if (result.modifiedCount !== 1) return res.status(404).json({ error: 'Message not found.' });
+  const cleanup = await Promise.allSettled((post.media || []).map(file =>
+    cloudinary.uploader.destroy(file.publicId, { resource_type: file.resourceType, invalidate: true }),
+  ));
+  const failed = cleanup.some(item => item.status === 'rejected');
+  if (failed) cleanup.filter(item => item.status === 'rejected').forEach(item => console.error(item.reason));
+  res.json({ ok: true, warning: failed ? 'The message was removed, but some media could not be deleted from Cloudinary.' : '' });
+}
+app.delete('/api/fan-chat/:id', signedIn, async (req, res) => {
+  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
+  try {
+    const id = new ObjectId(req.params.id);
+    const post = await FanChat.findOne({ _id: id, uid: req.user._id, deleted: { $ne: true } });
+    if (!post) return res.status(404).json({ error: 'Message not found or it is not yours.' });
+    await deleteFanMessage(post, { uid: req.user._id }, res);
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete your message.' }); }
 });
 
 // ---------- moderator tools ----------
@@ -214,11 +242,9 @@ app.delete('/api/admin/messages/:id', requireAdmin, async (req, res) => {
   if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
   try {
     const id = new ObjectId(req.params.id);
-    const post = await FanChat.findOne({ _id: id });
+    const post = await FanChat.findOne({ _id: id, deleted: { $ne: true } });
     if (!post) return res.status(404).json({ error: 'Message not found.' });
-    await FanChat.deleteOne({ _id: id });
-    await Promise.all((post.media || []).map(file => cloudinary.uploader.destroy(file.publicId, { resource_type: file.resourceType, invalidate: true })));
-    res.json({ ok: true });
+    await deleteFanMessage(post, {}, res);
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete this message.' }); }
 });
 app.post('/api/admin/blocks/:uid', requireAdmin, async (req, res) => {
@@ -290,16 +316,41 @@ const broadcast = o => online.forEach(set => set.forEach(ws => send(ws, o)));
 const activeGameOf = uid => [...games.values()].find(g => g.status !== 'done' && g.players.get(uid));
 const joined = g => [...g.players].filter(([, p]) => p.status === 'joined');
 
-function gamePayload(g) {
-  return { id: g.id, title: g.title, mode: g.mode, mins: g.mins, status: g.status, host: g.host, solo: g.solo, endsAt: g.endsAt, now: Date.now(),
-    players: [...g.players].map(([uid, p]) => ({ uid, name: p.name, char: p.char, status: p.status })) };
+function gamePayload(g, viewerUid) {
+  return {
+    id: g.id, title: g.title, mode: g.mode, mins: g.mins, questionCount: g.questionCount, status: g.status,
+    host: g.players.get(g.host)?.pub, solo: g.solo, endsAt: g.endsAt, now: Date.now(),
+    players: [...g.players].map(([uid, p]) => ({ uid, name: p.name, pub: p.pub, char: p.char, status: p.status })),
+    quiz: g.quiz ? {
+      number: g.quiz.index + 1,
+      total: g.quiz.questions.length,
+      question: g.quiz.questions[g.quiz.index] ? {
+        category: g.quiz.questions[g.quiz.index].category,
+        text: g.quiz.questions[g.quiz.index].text,
+        options: g.quiz.questions[g.quiz.index].options,
+        correctIndex: g.quiz.revealed ? g.quiz.questions[g.quiz.index].correctIndex : null,
+      } : null,
+      submitted: g.quiz.currentAnswers.size,
+      myChoice: g.quiz.currentAnswers.get(viewerUid) ?? null,
+      revealed: g.quiz.revealed,
+      scores: joined(g).map(([uid, player]) => ({
+        name: player.name,
+        pub: player.pub,
+        correct: g.quiz.scores.get(uid)?.correct || 0,
+        answered: g.quiz.scores.get(uid)?.answered || 0,
+      })),
+    } : null,
+  };
 }
-const pushState = g => g.players.forEach((_, uid) => sendUser(uid, { t: 'game', g: gamePayload(g) }));
+const pushState = g => g.players.forEach((_, uid) => sendUser(uid, { t: 'game', g: gamePayload(g, uid) }));
 async function leaderboard() {
   return Users.find({ wins: { $gt: 0 } }).sort({ wins: -1, name: 1 }).limit(5).project({ _id: 0, name: 1, pub: 1, wins: 1 }).toArray();
 }
 async function pushLobby() {
-  const list = [...games.values()].filter(g => g.status === 'lobby' && !g.solo).map(g => ({ id: g.id, host: g.players.get(g.host).name, title: g.title, mins: g.mins, n: joined(g).length }));
+  const list = [...games.values()].filter(g => g.status === 'lobby' && !g.solo).map(g => ({
+    id: g.id, host: g.players.get(g.host).name, title: g.title, mode: g.mode,
+    mins: g.mins, questionCount: g.questionCount, n: joined(g).length,
+  }));
   broadcast({ t: 'lobby', list, board: await leaderboard().catch(() => []) });
 }
 const addMsg = (g, m) => { m.ts = Date.now(); g.msgs.push(m); g.players.forEach((_, uid) => sendUser(uid, { t: 'msg', m })); };
@@ -333,16 +384,9 @@ async function aiTurn(g, first = false) {
 const verdict = p => p >= 85 ? 'Outstanding' : p >= 70 ? 'Very good' : p >= 55 ? 'Good' : p >= 40 ? 'Average' : 'Needs practice';
 async function judge(g, uid, p) {
   const mine = g.msgs.filter(m => m.uid === uid);
+  if (g.mode === 'quiz') return quizPlayerResult(g.quiz, uid);
   if (!mine.length) return { pct: 0, verdict: 'No performance', det: [], strengths: [], improve: [], note: '', extra: 'You did not play any lines, so there is nothing to score.' };
   const tr = transcript(g), det = [];
-  if (g.mode === 'quiz') {
-    const r = parseJSON(await ai('You are a strict fact-checking judge.', `Quiz about the Indian TV actor Karan Patel. Judge ONLY the answers of "${p.char}" (lines starting with that name). For every question give verdict "correct", "wrong" or "unsure". Use "unsure" whenever you are not confident of the true fact; never guess. Return ONLY JSON: {"answers":[{"q":"","answer":"","verdict":"correct|wrong|unsure","truth":""}],"note":""}\n\nConversation:\n${tr}`, 1500));
-    const a = r.answers || [], c = a.filter(x => x.verdict === 'correct').length, w = a.filter(x => x.verdict === 'wrong').length;
-    if (c + w === 0) return { pct: 0, verdict: 'Not enough answers', det: [], strengths: [], improve: [], note: r.note || '', extra: 'No answer could be verified, so no score.' };
-    const pct = c / (c + w) * 100;
-    a.forEach(x => det.push(['Q: ' + x.q, x.verdict, 'Your answer: ' + x.answer + (x.truth ? ' | Truth: ' + x.truth : '')]));
-    return { pct, verdict: verdict(pct), det, strengths: [], improve: [], note: r.note || '', extra: `${c} correct, ${w} wrong, ${a.length - c - w} unsure (unsure are not counted). Score = correct / (correct + wrong).` };
-  }
   const playerLines = mine.map(m => `${m.who}: ${m.t}`).join('\n');
   const P = actingJudgePrompt({
     character: p.char,
@@ -375,7 +419,7 @@ async function endGame(g) {
       if (r.pct != null) await Results.insertOne({ game: g.id, uid, pct: r.pct, detail: r, ts: new Date() });
     } catch (e) { console.error(e); }
     // everyone sees ONLY the top player; each player sees only their own full result
-    const msg = { t: 'result', mine: r, top: ps.length > 1 && top ? { name: top.name, id: top.id, pct: top.pct } : null };
+    const msg = { t: 'result', mine: r, top: top ? { name: top.name, id: top.id, pct: top.pct } : null };
     g.results.set(uid, msg); sendUser(uid, msg);
   }
   g.status = 'done'; pushState(g); pushLobby();
@@ -395,7 +439,7 @@ wss.on('connection', (ws, req) => {
     online.get(uid).add(ws);
     pushLobby();
     const g0 = activeGameOf(uid) || [...games.values()].find(g => g.results.get(uid) && Date.now() - (g.endsAt || 0) < 30 * 60000);
-    if (g0) { send(ws, { t: 'game', g: gamePayload(g0) }); send(ws, { t: 'history', msgs: g0.msgs }); if (g0.results.get(uid)) send(ws, g0.results.get(uid)); }
+    if (g0) { send(ws, { t: 'game', g: gamePayload(g0, uid) }); send(ws, { t: 'history', msgs: g0.msgs }); if (g0.results.get(uid)) send(ws, g0.results.get(uid)); }
   });
   ws.on('message', async raw => {
     const u = await ready; if (!u) return;
@@ -407,23 +451,55 @@ wss.on('connection', (ws, req) => {
       if (m.t === 'host') {
         if (activeGameOf(uid)) return err('You are already in a game.');
         const mode = MODES[m.mode] ? m.mode : 'serial', show = clamp(m.show, 60), char = clamp(m.char, 40);
-        if (!char || (mode === 'serial' && !show)) return err('Choose a show and a character.');
+        if ((mode === 'serial' && !char) || (mode === 'serial' && !show)) return err('Choose a show and the character you want to play.');
+        const questionCount = mode === 'quiz' ? Number(m.questionCount) : 0;
+        if (mode === 'quiz' && !QUIZ_QUESTION_COUNTS.includes(questionCount)) return err('Choose 5, 10, 15, 20, 25, or 30 quiz questions.');
         let id; do { id = crypto.randomBytes(3).toString('hex').toUpperCase(); } while (games.has(id));
-        const mins = Math.max(1, Math.min(30, +m.mins || 5));
-        const g = { id, host: uid, mode, show, lang: clamp(m.lang, 30) || 'Hinglish', mins, notes: clamp(m.notes, 800), solo: !!m.solo, status: 'lobby', title: mode === 'serial' ? show : MODES[mode], players: new Map([[uid, { name: me.name, char, status: 'joined' }]]), msgs: [], results: new Map() };
+        const mins = mode === 'serial' ? Math.max(1, Math.min(30, +m.mins || 5)) : 0;
+        let quiz = null;
+        try {
+          if (mode === 'quiz') quiz = { questions: buildQuiz(questionCount), index: 0, currentAnswers: new Map(), revealed: false, scores: new Map() };
+        } catch (error) { return err(error.message); }
+        const player = { name: me.name, pub: me.pub, char: mode === 'quiz' ? me.name : char, status: 'joined' };
+        const g = {
+          id, host: uid, mode, show, lang: clamp(m.lang, 30) || 'Hinglish', mins, questionCount,
+          quiz, notes: clamp(m.notes, 800), solo: !!m.solo, status: 'lobby',
+          title: mode === 'serial' ? show : MODES[mode], players: new Map([[uid, player]]), msgs: [], results: new Map(),
+        };
         games.set(id, g);
         if (g.solo) startGame(g); else { pushState(g); pushLobby(); }
       } else if (m.t === 'join') {
         const g = games.get(m.gid); if (!g || g.status !== 'lobby') return err('Game not found, or it has already started.');
         if (activeGameOf(uid)) return err('You are already in a game.');
-        const char = clamp(m.char, 40); if (!char) return err('Enter your character first.');
-        if ([...g.players.values()].some(p => p.char.toLowerCase() === char.toLowerCase())) return err('That character is already taken. Choose another.');
-        g.players.set(uid, { name: me.name, char, status: 'requested' }); pushState(g);
+        const char = g.mode === 'quiz' ? me.name : clamp(m.char, 40);
+        if (g.mode === 'serial' && !char) return err('Choose the character you want to play before requesting to join.');
+        if (g.mode === 'serial' && [...g.players.values()].some(p => p.char.toLowerCase() === char.toLowerCase())) return err('That character is already taken. Choose another.');
+        g.players.set(uid, { name: me.name, pub: me.pub, char, status: 'requested' });
+        pushState(g);
+        sendUser(g.host, { t: 'joinRequest', gid: g.id, name: me.name, pub: me.pub, char });
+        send(ws, { t: 'requestSent', gid: g.id, host: g.players.get(g.host).name });
       } else if (m.t === 'accept' || m.t === 'reject') {
         const g = games.get(m.gid); if (!g || g.host !== uid || g.status !== 'lobby') return;
         const p = g.players.get(+m.uid); if (!p || p.status !== 'requested') return;
         if (m.t === 'accept') p.status = 'joined'; else { g.players.delete(+m.uid); sendUser(+m.uid, { t: 'kicked' }); }
         pushState(g); pushLobby();
+      } else if (m.t === 'quizAnswer') {
+        const g = games.get(m.gid);
+        if (!g || g.mode !== 'quiz' || g.status !== 'live' || !g.quiz || !g.players.has(uid)) return err('That quiz is not accepting answers.');
+        if (!submitQuizAnswer(g.quiz, uid, Number(m.choice))) return err('Your answer was already submitted, or that option is not valid.');
+        if (g.quiz.currentAnswers.size === joined(g).length) revealQuizQuestion(g.quiz, joined(g));
+        pushState(g);
+      } else if (m.t === 'quizNext') {
+        const g = games.get(m.gid);
+        if (!g || g.mode !== 'quiz' || g.status !== 'live' || g.host !== uid || !g.quiz) return err('Only the quiz host can control the next question.');
+        if (!g.quiz.revealed) revealQuizQuestion(g.quiz, joined(g));
+        else if (g.quiz.index + 1 >= g.quiz.questions.length) { await endGame(g); return; }
+        else {
+          g.quiz.index += 1;
+          g.quiz.currentAnswers.clear();
+          g.quiz.revealed = false;
+        }
+        pushState(g);
       } else if (m.t === 'start') {
         const g = games.get(m.gid); if (g && g.host === uid && g.status === 'lobby') startGame(g);
       } else if (m.t === 'say') {
@@ -445,8 +521,14 @@ wss.on('connection', (ws, req) => {
 });
 function startGame(g) {
   [...g.players].forEach(([id, p]) => { if (p.status !== 'joined') { g.players.delete(id); sendUser(id, { t: 'kicked' }); } });
-  g.status = 'live'; g.endsAt = Date.now() + (TEST_SECONDS ? TEST_SECONDS * 1000 : g.mins * 60000);
-  g.timer = setTimeout(() => endGame(g), g.endsAt - Date.now());
-  pushState(g); pushLobby(); aiTurn(g, true);
+  g.status = 'live';
+  if (g.mode === 'quiz') {
+    g.quiz.scores = new Map(joined(g).map(([uid]) => [uid, { correct: 0, answered: 0, details: [] }]));
+  } else {
+    g.endsAt = Date.now() + (TEST_SECONDS ? TEST_SECONDS * 1000 : g.mins * 60000);
+    g.timer = setTimeout(() => endGame(g), g.endsAt - Date.now());
+  }
+  pushState(g); pushLobby();
+  if (g.mode !== 'quiz') aiTurn(g, true);
 }
 server.listen(PORT, () => console.log('Running on http://localhost:' + PORT));
