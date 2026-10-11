@@ -469,8 +469,8 @@ wss.on('connection', (ws, req) => {
     if (!online.has(uid)) online.set(uid, new Set());
     online.get(uid).add(ws);
     pushLobby();
-    const g0 = activeGameOf(uid) || [...games.values()].find(g => g.results.get(uid) && Date.now() - (g.endsAt || 0) < 30 * 60000);
-    if (g0) { send(ws, { t: 'game', g: gamePayload(g0, uid) }); send(ws, { t: 'history', msgs: g0.msgs }); if (g0.results.get(uid)) send(ws, g0.results.get(uid)); }
+    const g0 = activeGameOf(uid);
+    if (g0) { send(ws, { t: 'game', g: gamePayload(g0, uid) }); send(ws, { t: 'history', msgs: g0.msgs }); }
   });
   ws.on('message', async raw => {
     const u = await ready; if (!u) return;
