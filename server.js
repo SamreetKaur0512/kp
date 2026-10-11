@@ -6,6 +6,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { createCloudinaryStorage } from './cloudinary-storage.js';
 import { ACTING_CRITERIA, actingJudgePrompt } from './acting-judge.js';
 import { buildQuiz, QUIZ_QUESTION_COUNTS, quizPlayerResult, revealQuizQuestion, submitQuizAnswer } from './quiz-game.js';
+import { removeHumanCharacterLines, roleplaySystemPrompt, roleplayTurnPrompt } from './roleplay.js';
 import crypto from 'crypto';
 import http from 'http';
 import path from 'path';
@@ -140,7 +141,7 @@ app.get('/api/fan-chat', async (req, res) => {
         media: (post.media || []).map(file => ({ id: file.id, url: file.url, name: file.name, mime: file.mime })),
       }];
     });
-    const [{ members = 0 } = {}] = await FanChat.aggregate([{ $match: { uid: { $exists: true } } }, { $group: { _id: '$uid' } }, { $count: 'members' }]).toArray();
+    const members = onlineCount();
     res.json({ messages, members });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load the fan chat.' }); }
 });
@@ -322,6 +323,7 @@ const clamp = (s, n) => String(s ?? '').trim().slice(0, n);
 const send = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const sendUser = (uid, o) => online.get(uid)?.forEach(ws => send(ws, o));
 const broadcast = o => online.forEach(set => set.forEach(ws => send(ws, o)));
+const onlineCount = () => [...online.values()].filter(sockets => [...sockets].some(socket => socket.readyState === 1)).length;
 const activeGameOf = uid => [...games.values()].find(g => g.status !== 'done' && g.players.get(uid));
 const joined = g => [...g.players].filter(([, p]) => p.status === 'joined');
 
@@ -367,6 +369,15 @@ async function pushLobby() {
 const addMsg = (g, m) => { m.ts = Date.now(); g.msgs.push(m); g.players.forEach((_, uid) => sendUser(uid, { t: 'msg', m })); };
 
 function sysPrompt(g) {
+  if (g.mode === 'serial') {
+    return roleplaySystemPrompt({
+      mode: g.mode,
+      show: g.show,
+      lang: g.lang,
+      characters: joined(g).map(([, player]) => player.char),
+      notes: g.notes,
+    });
+  }
   const humans = joined(g).map(([, p]) => p.char);
   const base = `You run a fan-made acting game about the Indian TV actor Karan Patel. LANGUAGE: reply in the same language AND script the players type (preferred: ${g.lang}). If they write Hinglish in Roman letters, write the dialogue and the (bracket) actions in Hinglish in Roman letters too; do not use long English narration. FORMAT: every line starts with the speaking character's name, then a short (bracket) action, then the dialogue. Use 2 to 3 different characters per reply, each with a distinct voice, in under 100 words in total. ACTING RULES: stay inside the show's world, relationships and tone; address the player's character by relationship (bhai, jiju, beta, maa...) when it fits; react specifically to what the player just said; add tension or a small twist every few turns; never repeat earlier lines. FACTS: use only what you are confident about for real shows and people. If unsure about a character's details, improvise in the spirit of the show and do not present guesses as facts. ${g.notes ? 'HOST NOTES about characters and story (trust these over your memory): ' + g.notes + ' ' : ''}Never claim to be the real Karan Patel; this is fiction. Never invent harmful or private claims about real people.`;
   const who = `Human players play: ${humans.join(', ')}. You (AI) play EVERY other character and never speak for the human characters.`;
@@ -383,8 +394,17 @@ async function aiTurn(g, first = false) {
       g.aiAgain = false;
       await sleep(first ? 200 : 1200);
       if (g.status !== 'live') break;
-      const out = await ai(sysPrompt(g), `Scene so far:\n${transcript(g) || '(nothing yet)'}\n\n` + (g.msgs.length ? 'Continue: react as the AI-played characters.' : 'Start the scene: set it in brackets and let the AI-played characters speak first.'), 350);
-      addMsg(g, { uid: 0, who: 'AI', t: out.trim() });
+      const players = joined(g);
+      const playerMessages = g.msgs.filter(message => players.some(([uid]) => uid === message.uid));
+      const latestPlayerTurn = playerMessages.length ? `${playerMessages.at(-1).who}: ${playerMessages.at(-1).t}` : '';
+      const request = roleplayTurnPrompt({
+        transcript: transcript(g),
+        latestPlayerTurn,
+        first: g.msgs.length === 0,
+      });
+      const raw = await ai(sysPrompt(g), request, 500);
+      const out = removeHumanCharacterLines(raw, players.map(([, player]) => player.char));
+      addMsg(g, { uid: 0, who: 'AI', t: out || '(The AI cast leaves the human-played characters’ words and actions to their players.)' });
       first = false;
     } while (g.aiAgain);
   } catch (e) { addMsg(g, { uid: 0, who: 'System', t: '(AI had a problem. Send another line to continue.)' }); }
@@ -530,7 +550,12 @@ wss.on('connection', (ws, req) => {
       }
     } catch (e) { console.error(e); err('Something went wrong.'); }
   });
-  ws.on('close', () => { if (ws.uid != null) online.get(ws.uid)?.delete(ws); });
+  ws.on('close', () => {
+    if (ws.uid == null) return;
+    const sockets = online.get(ws.uid);
+    sockets?.delete(ws);
+    if (sockets?.size === 0) online.delete(ws.uid);
+  });
 });
 function startGame(g) {
   [...g.players].forEach(([id, p]) => { if (p.status !== 'joined') { g.players.delete(id); sendUser(id, { t: 'kicked' }); } });

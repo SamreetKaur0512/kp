@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { isRoleplayMediaMessage, roleplaySystemPrompt, roleplayTurnPrompt } from '../roleplay.js';
+import { isRoleplayMediaMessage, removeHumanCharacterLines, roleplaySystemPrompt, roleplayTurnPrompt } from '../roleplay.js';
 
 const promptFor = (show, mode = 'serial') => roleplaySystemPrompt({
   mode,
@@ -48,7 +48,27 @@ test('AI can play multiple relevant characters but never takes over player roles
   assert.match(prompt, /Aly just arrived/);
   assert.match(prompt, /If presence is unclear, don't invent an entrance/);
   assert.match(prompt, /Never write dialogue, thoughts, or decisions for a human-played character/);
+  assert.match(prompt, /ABSOLUTE ROLE BOUNDARY/);
+  assert.match(prompt, /only their human players may decide what they say or do/i);
+  assert.match(prompt, /If a character went outside or left, they remain away/);
+  assert.match(prompt, /show the physical transition first/);
+  assert.match(prompt, /don't restrict the cast to an arbitrary number/);
   assert.match(prompt, /up to about 140 words/);
+});
+
+test('AI output filter removes speaker lines for player-owned characters only', () => {
+  const output = [
+    'Romi Bhalla: (looks toward the door) Kya hua?',
+    'Ishita Iyer: Raman, main aa gayi.',
+    'Ishita: (smiles) Main aa gayi.',
+    'Raman Bhalla (smiles): Thanks.',
+    'Santoshi Bhalla: Chai thandi ho rahi hai.',
+  ].join('\n');
+
+  assert.equal(
+    removeHumanCharacterLines(output, ['Ishita Iyer', 'Raman Bhalla']),
+    'Romi Bhalla: (looks toward the door) Kya hua?\nSantoshi Bhalla: Chai thandi ho rahi hai.',
+  );
 });
 
 test('latest player turn guides whether a mentioned character is present', () => {
