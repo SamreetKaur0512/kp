@@ -357,7 +357,7 @@ function gamePayload(g, viewerUid) {
 }
 const pushState = g => g.players.forEach((_, uid) => sendUser(uid, { t: 'game', g: gamePayload(g, uid) }));
 async function leaderboard() {
-  return Users.find({ wins: { $gt: 0 } }).sort({ wins: -1, name: 1 }).limit(5).project({ _id: 0, name: 1, pub: 1, wins: 1 }).toArray();
+  return Users.find({ wins: { $gt: 0 } }).sort({ wins: -1, name: 1 }).limit(3).project({ _id: 0, name: 1, pub: 1, wins: 1 }).toArray();
 }
 async function pushLobby() {
   const list = [...games.values()].filter(g => g.status === 'lobby' && !g.solo).map(g => ({
@@ -481,7 +481,8 @@ wss.on('connection', (ws, req) => {
       const me = u;
       if (m.t === 'host') {
         if (activeGameOf(uid)) return err('You are already in a game.');
-        const mode = MODES[m.mode] ? m.mode : 'serial', show = clamp(m.show, 60), char = clamp(m.char, 40);
+        if (!MODES[m.mode]) return err('Choose Serial Role-Play or Karan Patel Quiz first.');
+        const mode = m.mode, show = clamp(m.show, 60), char = clamp(m.char, 40);
         if ((mode === 'serial' && !char) || (mode === 'serial' && !show)) return err('Choose a show and the character you want to play.');
         const questionCount = mode === 'quiz' ? Number(m.questionCount) : 0;
         if (mode === 'quiz' && !QUIZ_QUESTION_COUNTS.includes(questionCount)) return err('Choose 5, 10, 15, 20, 25, or 30 quiz questions.');
@@ -517,8 +518,9 @@ wss.on('connection', (ws, req) => {
           send(ws, { t: 'requestSent', gid: g.id, host: g.players.get(g.host).name });
         }
       } else if (m.t === 'accept' || m.t === 'reject') {
-        const g = games.get(m.gid); if (!g || g.host !== uid || g.status !== 'lobby') return;
-        const p = g.players.get(+m.uid); if (!p || p.status !== 'requested') return;
+        const g = games.get(m.gid); if (!g || g.status !== 'lobby') return err('This lobby is no longer available.');
+        if (g.host !== uid) return err('Only the host can manage join requests.');
+        const p = g.players.get(+m.uid); if (!p || p.status !== 'requested') return err('This join request is no longer pending.');
         if (m.t === 'accept') p.status = 'joined'; else { g.players.delete(+m.uid); sendUser(+m.uid, { t: 'kicked' }); }
         pushState(g); pushLobby();
       } else if (m.t === 'quizAnswer') {
@@ -534,20 +536,29 @@ wss.on('connection', (ws, req) => {
         revealAndScheduleQuizAdvance(g);
         pushState(g);
       } else if (m.t === 'start') {
-        const g = games.get(m.gid); if (g && g.host === uid && g.status === 'lobby') startGame(g);
+        const g = games.get(m.gid);
+        if (!g || g.status !== 'lobby') return err('This lobby is no longer available.');
+        if (g.host !== uid) return err('Only the host can start this game.');
+        startGame(g);
       } else if (m.t === 'say') {
         const g = games.get(m.gid), p = g?.players.get(uid);
-        if (!g || g.status !== 'live' || p?.status !== 'joined') return;
+        if (!g || g.status !== 'live' || p?.status !== 'joined') return err('You can send dialogue only after joining a live game.');
         const now = Date.now(); if (now - ws.last < 1000) return err('Slow down a little.'); ws.last = now;
-        const t = clamp(m.t2, 500); if (!t || g.msgs.length > 300) return;
+        const t = clamp(m.t2, 500); if (!t) return err('Type your dialogue before pressing Send.');
+        if (g.msgs.length > 300) return err('This role-play has reached its message limit.');
         addMsg(g, { uid, who: p.char, t }); aiTurn(g);
       } else if (m.t === 'end') {
-        const g = games.get(m.gid); if (g && g.host === uid) endGame(g);
+        const g = games.get(m.gid);
+        if (!g || g.status !== 'live') return err('This game is no longer live.');
+        if (g.host !== uid) return err('Only the host can end this game.');
+        endGame(g);
       } else if (m.t === 'leave') {
-        const g = games.get(m.gid); if (!g) return;
+        const g = games.get(m.gid); if (!g) return err('This game is no longer available.');
+        if (!g.players.has(uid)) return err('You are not a player in this game.');
         if (g.status === 'lobby') { if (g.host === uid) { g.players.forEach((_, id) => sendUser(id, { t: 'kicked' })); games.delete(g.id); } else { g.players.delete(uid); pushState(g); } pushLobby(); }
         else if (g.status === 'done') { /* just closing results */ }
-      }
+        else return err('You cannot leave while this game is live.');
+      } else return err('That action is not supported. Refresh the page and try again.');
     } catch (e) { console.error(e); err('Something went wrong.'); }
   });
   ws.on('close', () => {

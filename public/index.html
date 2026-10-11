@@ -42,6 +42,7 @@ dialog{width:min(440px,calc(100% - 28px));padding:0;border:1px solid var(--line)
 .member-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
 .member-row span{overflow-wrap:anywhere}
 .moderation-error{min-height:20px;color:#a83327}
+.action-error{color:#b42318!important;font-weight:700}
 @media(max-width:520px){main{padding:11px}.masthead{align-items:flex-start}.account{gap:7px;flex-direction:column;align-items:flex-end}.account .btn{padding:7px 10px}.fan-intro{align-items:flex-start;flex-direction:column}.fan-intro h1{font-size:1.7rem}.room-count{text-align:left}.chat-head{padding:13px}.chat-compose{padding:11px}.compose-row{align-items:stretch;flex-direction:column}.compose-actions{justify-content:space-between}.attach-btn{flex:1}.side-stack{grid-template-columns:1fr}.side-stack .game-card{grid-column:auto}.auth-brand h1{font-size:1.4rem}}
 body{background:radial-gradient(ellipse at top left,#fff4df 0,transparent 36%),radial-gradient(ellipse at top right,#dceef2 0,transparent 32%),var(--paper)}
 .card{border-radius:16px;box-shadow:0 8px 24px #17383b0b;padding:20px}
@@ -103,8 +104,8 @@ input,select,textarea{min-width:0;border-radius:10px}
     <aside class="side-stack">
       <section class="card mode-card"><div class="section-title"><h2>Play together</h2><span class="tag">Role-play</span></div><div class="opts" id="modes"></div></section>
       <section class="card show-card" id="showBox"><h2>Choose a show</h2><div class="opts" id="shows"></div><input id="showCustom" placeholder="Or type another show / project"></section>
-      <section class="card game-card"><div id="roleBox"><h2 id="charH">Character you will play</h2><input id="char" placeholder="Enter the character you want to play"><p class="small">Your account name is shown separately; type the show character you want to portray.</p></div><h2>Language</h2><input id="lang" value="Hinglish" placeholder="Hindi, Hinglish, English..."><div id="lengthBox"><h2>Role-play length</h2><select id="mins"><option>2</option><option selected>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select></div><div id="questionCountBox" class="hide"><h2>Number of quiz questions</h2><select id="questionCount"><option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select><p class="small">Every question has four options. No game timer.</p></div><p class="row" style="margin-top:12px"><button class="btn" id="solo">Play solo</button><button class="btn alt" id="host">Host a game</button></p><div class="small" id="err" style="color:#a83327"></div></section>
-      <section class="card"><h2>Join a game</h2><div class="row"><input id="code" placeholder="Game ID"><button class="btn alt" id="joinc">Join</button></div><div class="small" id="joinStatus" role="status"></div><h2 style="margin-top:18px">Open games</h2><div id="open" class="small">None right now.</div></section>
+      <section class="card game-card"><div id="roleBox"><h2 id="charH">Character you will play</h2><input id="char" placeholder="Enter the character you want to play"><p class="small">Your account name is shown separately; type the show character you want to portray.</p></div><h2>Language</h2><input id="lang" value="Hinglish" placeholder="Hindi, Hinglish, English..."><div id="lengthBox"><h2>Role-play length</h2><select id="mins"><option>2</option><option selected>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select></div><div id="questionCountBox" class="hide"><h2>Number of quiz questions</h2><select id="questionCount"><option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select><p class="small">Every question has four options. No game timer.</p></div><p class="row" style="margin-top:12px"><button class="btn" id="solo">Play solo</button><button class="btn alt" id="host">Host a game</button></p><div class="small" id="err" role="alert"></div></section>
+      <section class="card"><h2>Join a game</h2><div class="row"><input id="code" placeholder="Game ID"><button class="btn alt" id="joinc">Join</button></div><div class="small" id="joinStatus" role="alert"></div><h2 style="margin-top:18px">Open games</h2><div id="open" class="small">None right now.</div></section>
       <section class="card leader-card"><h2>Top players</h2><div id="board" class="small">No wins yet.</div></section>
       <section class="card warn"><b>Fan-made game.</b> Not affiliated with or endorsed by Karan Patel or his team. AI replies and scores may be inaccurate and do not represent any real person's words or opinions.</section>
     </aside>
@@ -117,12 +118,12 @@ input,select,textarea{min-width:0;border-radius:10px}
   <div class="card"><h2>Players</h2><div id="plist"></div><div class="small">All other characters will be played by AI.</div></div>
   <div class="card hide" id="reqs"><h2>Join requests</h2><div id="rlist"></div></div>
   <p><button class="btn hide" id="go">Start game for everyone</button> <button class="btn alt" id="leave">Leave</button></p>
-  <div class="small" id="lmsg"></div>
+  <div class="small" id="lmsg" role="alert"></div>
 </div>
 
 <div id="play" class="hide">
   <div class="bar"><div><b id="title"></b><div class="small" id="sub"></div></div><div id="timer">00:00</div></div>
-  <section id="roleplayArea"><div id="chat"></div><div class="row"><input id="msg" maxlength="500" placeholder="Type your dialogue... use (brackets) for actions"><button class="btn" id="send">Send</button></div><div class="small">Role-play is text-only; images and videos cannot be sent here.</div></section>
+  <section id="roleplayArea"><div id="chat"></div><div class="row"><input id="msg" maxlength="500" placeholder="Type your dialogue... use (brackets) for actions"><button class="btn" id="send">Send</button></div><div class="small action-error" id="playStatus" role="alert"></div><div class="small">Role-play is text-only; images and videos cannot be sent here.</div></section>
   <section id="quizArea" class="quiz-panel hide"><div class="quiz-progress"><span id="quizCategory"></span><span id="quizProgress"></span><span id="quizCountdown"></span></div><h2 class="quiz-question" id="quizQuestion"></h2><div class="quiz-options" id="quizOptions"></div><div class="quiz-status" id="quizStatus" role="status"></div><div id="quizScores" class="quiz-scoreboard"></div><button class="btn hide" id="quizNext" type="button"></button></section>
   <p><button class="btn alt hide" id="end">End game now (host)</button></p>
 </div>
@@ -137,6 +138,12 @@ input,select,textarea{min-width:0;border-radius:10px}
 <script>
 const $=id=>document.getElementById(id);
 const mk=(p,tag,t)=>{const e=document.createElement(tag);if(t!=null)e.textContent=t;p.appendChild(e);return e};
+function actionError(id,message){
+  const target=$(id);target.textContent=message;target.classList.toggle("action-error",Boolean(message));
+}
+function actionStatus(id,message,isError=false){
+  const target=$(id);target.textContent=message;target.classList.toggle("action-error",isError);
+}
 const MODES={serial:"Serial Role-Play",quiz:"Karan Patel Quiz"};
 const SHOWS=["Yeh Hai Mohabbatein","Kasautii Zindagii Kay","Kuch Toh Log Kahenge","Qayamat Ki Raat","Ek Hasina Thi","Ishq Mein Marjawan"];
 let ws,me=null,mode="serial",show="",G=null,tId=null,off=0,regMode=false,shown="",fanPoll=null,isModerator=false,joinPending=false;
@@ -306,10 +313,27 @@ chips($("modes"),Object.entries(MODES),k=>{mode=k;$("showBox").classList.toggle(
 chips($("shows"),SHOWS.map(s=>[s,s]),k=>{show=k;$("showCustom").value=""});
 $("showCustom").oninput=()=>{show=$("showCustom").value;[...$("shows").children].forEach(c=>c.classList.remove("on"))};
 const form=()=>({mode,show:(show||$("showCustom").value).trim(),char:$("char").value.trim(),lang:$("lang").value,mins:+$("mins").value,questionCount:+$("questionCount").value});
-const tx=o=>ws&&ws.readyState===1?ws.send(JSON.stringify(o)):(joinPending?$("joinStatus").textContent="Connecting… try again.":$("err").textContent="Connecting... try again.");
-$("solo").onclick=()=>tx({t:"host",solo:true,...form()});
-$("host").onclick=()=>tx({t:"host",...form()});
-function joinGame(gid,direct){
+const tx=o=>{
+  if(ws&&ws.readyState===1){ws.send(JSON.stringify(o));return true}
+  const target=joinPending?"joinStatus":"err";
+  joinPending=false;
+  actionError(target,"Not connected yet. Wait a moment and try again.");
+  return false;
+};
+function hostGame(solo){
+  actionError("err","");
+  if(mode==="serial"){
+    if(!(show||$("showCustom").value).trim()){actionError("err","Choose a show or enter a project name before starting.");$("showCustom").focus();return}
+    if(!$("char").value.trim()){actionError("err","Enter the character you want to play before starting.");$("char").focus();return}
+  }
+  tx({t:"host",solo,...form()});
+}
+$("solo").onclick=()=>hostGame(true);
+$("host").onclick=()=>hostGame(false);
+function joinGame(gid,direct,gameMode=mode){
+  actionStatus("joinStatus","");
+  if(!gid){actionError("joinStatus","Enter the Game ID first.");$("code").focus();return}
+  if(gameMode==="serial"&&!$("char").value.trim()){actionError("joinStatus","Enter the character you want to play before joining.");$("char").focus();return}
   joinPending=true;$("joinStatus").textContent=direct?"Joining game…":"Sending request…";
   tx({t:"join",gid,char:$("char").value.trim(),direct});
 }
@@ -323,20 +347,21 @@ function connect(){
 }
 function lobby(m){
   const o=$("open");o.innerHTML="";if(!m.list.length)o.textContent="None right now.";
-  m.list.forEach(g=>{const r=mk(o,"div");r.className="row";const details=g.mode==="quiz"?`${g.questionCount} questions`:`${g.mins} min`;mk(r,"span",`${g.host} is starting "${g.title}" (${details}, ${g.n} in) · ID ${g.id}`).style.flex="1";const b=mk(r,"button","Request to join");b.className="btn alt";b.onclick=()=>joinGame(g.id,false)});
+  m.list.forEach(g=>{const r=mk(o,"div");r.className="row";const details=g.mode==="quiz"?`${g.questionCount} questions`:`${g.mins} min`;mk(r,"span",`${g.host} is starting "${g.title}" (${details}, ${g.n} in) · ID ${g.id}`).style.flex="1";const b=mk(r,"button","Request to join");b.className="btn alt";b.onclick=()=>joinGame(g.id,false,g.mode)});
   const bd=$("board");bd.innerHTML="";if(!m.board.length)bd.textContent="No wins yet.";m.board.forEach((u,i)=>mk(bd,"div",`${i+1}. ${u.name} (ID ${u.pub}) — ${u.wins} wins`));
 }
 function err(m){
-  if(!$("play").classList.contains("hide")&&G?.mode==="quiz")$("quizStatus").textContent=m.e;
-  else if(!$("lobby").classList.contains("hide"))$("lmsg").textContent=m.e;
-  else if(joinPending){$("joinStatus").textContent=m.e;joinPending=false}
-  else $("err").textContent=m.e;
+  if(!$("play").classList.contains("hide")&&G?.mode==="quiz")actionError("quizStatus",m.e);
+  else if(!$("play").classList.contains("hide"))actionError("playStatus",m.e);
+  else if(!$("lobby").classList.contains("hide"))actionError("lmsg",m.e);
+  else if(joinPending){actionError("joinStatus",m.e);joinPending=false}
+  else actionError("err",m.e);
 }
-function kicked(){G=null;screen("home");$("err").textContent="The host did not accept your request, or the game was cancelled."}
+function kicked(){G=null;screen("home");actionError("joinStatus","The host declined your request or cancelled the game.");}
 function joinRequest(m){if(G&&G.id===m.gid&&G.host===me.id){$("lmsg").textContent=`New join request: ${m.name} (ID ${m.pub}) wants to play ${m.char}. Accept or reject it below.`;screen("lobby");drawLobby(true)}}
 function playerJoined(m){if(G&&G.id===m.gid&&G.host===me.id){$("lmsg").textContent=`${m.name} (ID ${m.pub}) joined the game.`;screen("lobby");drawLobby(true)}}
-function requestSent(m){joinPending=false;$("joinStatus").textContent=`Request sent to ${m.host}. Waiting for approval.`}
-function joinedGame(m){joinPending=false;$("joinStatus").textContent=`Joined ${m.host}'s game.`}
+function requestSent(m){joinPending=false;actionStatus("joinStatus",`Request sent to ${m.host}. Waiting for approval.`)}
+function joinedGame(m){joinPending=false;actionStatus("joinStatus",`Joined ${m.host}'s game.`)}
 function game(m){
   G=m.g;off=G.now-Date.now();
   const isHost=me&&G.host===me.id;
@@ -353,7 +378,7 @@ function drawLobby(isHost){
     else if(isHost){const r=mk(rq,"div");r.className="row";mk(r,"span",`${p.name} (ID ${p.pub}) wants to join${G.mode==="serial"?" as "+p.char:""}`).style.flex="1";const a=mk(r,"button","Accept");a.className="btn";a.onclick=()=>tx({t:"accept",gid:G.id,uid:p.uid});const x=mk(r,"button","Reject");x.className="btn alt";x.onclick=()=>tx({t:"reject",gid:G.id,uid:p.uid})}});
   $("reqs").classList.toggle("hide",!rq.children.length);$("go").classList.toggle("hide",!isHost);
   const mine=G.players.find(p=>p.pub===me.id);
-  $("lmsg").textContent=isHost?(rq.children.length?`${rq.children.length} join request${rq.children.length===1?"":"s"} waiting. Accept or reject below.`:"Share the Game ID. Only you can start the game."):mine&&mine.status==="requested"?"Waiting for the host to accept...":"You are in. Waiting for the host to start.";
+  actionStatus("lmsg",isHost?(rq.children.length?`${rq.children.length} join request${rq.children.length===1?"":"s"} waiting. Accept or reject below.`:"Share the Game ID. Only you can start the game."):mine&&mine.status==="requested"?"Waiting for the host to accept...":"You are in. Waiting for the host to start.");
 }
 function drawQuiz(isHost){
   const quiz=G.quiz;if(!quiz?.question)return;
@@ -368,7 +393,7 @@ function drawQuiz(isHost){
     button.disabled=quiz.myChoice!==null||quiz.revealed;
     button.onclick=()=>{button.disabled=true;$("quizStatus").textContent="Submitting answer…";tx({t:"quizAnswer",gid:G.id,choice:index})};
   });
-  $("quizStatus").textContent=quiz.revealed?`Correct answer: ${quiz.question.options[quiz.question.correctIndex]}`:quiz.myChoice!==null?"Answer submitted. Waiting for everyone else or the host to reveal the answer.":`${quiz.submitted} answer${quiz.submitted===1?"":"s"} submitted.`;
+  actionStatus("quizStatus",quiz.revealed?`Correct answer: ${quiz.question.options[quiz.question.correctIndex]}`:quiz.myChoice!==null?"Answer submitted. Waiting for everyone else or the host to reveal the answer.":`${quiz.submitted} answer${quiz.submitted===1?"":"s"} submitted.`);
   const scores=$("quizScores");scores.replaceChildren();
   [...quiz.scores].sort((a,b)=>b.correct-a.correct||a.name.localeCompare(b.name)).forEach((player,index)=>{
     const row=mk(scores,"div");row.className="quiz-score-row";mk(row,"span",`${index+1}. ${player.name} (ID ${player.pub})`);mk(row,"b",`${player.correct}/${quiz.total}`);
@@ -383,11 +408,11 @@ function tickQuiz(){
   const seconds=Math.max(0,Math.ceil((until-Date.now())/1000));
   $("quizCountdown").textContent=`Next question in ${seconds}s`;
 }
-$("go").onclick=()=>tx({t:"start",gid:G.id});$("leave").onclick=()=>{tx({t:"leave",gid:G.id});G=null;screen("home")};$("end").onclick=()=>confirm("End the game for everyone and get scores?")&&tx({t:"end",gid:G.id});
+ $("go").onclick=()=>{actionError("lmsg","");tx({t:"start",gid:G.id})};$("leave").onclick=()=>{tx({t:"leave",gid:G.id});G=null;screen("home")};$("end").onclick=()=>confirm("End the game for everyone and get scores?")&&tx({t:"end",gid:G.id});
 function addMsg(m){const d=mk($("chat"),"div",m.who+": "+m.t);const p=G&&G.players.find(x=>x.name===me.name);d.className="m"+(p&&m.uid&&m.who===p.char?" me":"");$("chat").scrollTop=1e9}
 function msg(m){addMsg(m.m)}
 function history(m){$("chat").innerHTML="";m.msgs.forEach(addMsg)}
-function send(){const v=$("msg").value.trim();if(!v)return;$("msg").value="";tx({t:"say",gid:G.id,t2:v})}
+function send(){const v=$("msg").value.trim();if(!v){actionError("playStatus","Type your dialogue before pressing Send.");$("msg").focus();return}actionError("playStatus","");$("msg").value="";tx({t:"say",gid:G.id,t2:v})}
 $("send").onclick=send;$("msg").onkeydown=e=>{if(e.key==="Enter")send()};
 
 function result(m){
