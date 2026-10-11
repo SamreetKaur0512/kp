@@ -4,7 +4,7 @@ Real multiplayer app: own register/login, lobby, public Game IDs, join requests,
 AI scoring, leaderboard. Everything runs on the server, so friends only need the link.
 
 ## Run locally
-1. Copy `.env.example` to `.env`, set `MONGODB_URI`, and set `GEMINI_API_KEY` (or set `AI_PROVIDER=claude` and `ANTHROPIC_API_KEY`). Set a private `ADMIN_PASSWORD` if you want moderator tools.
+1. Copy `.env.example` to `.env`, set `MONGODB_URI` and the three Cloudinary values. Set `GEMINI_API_KEY` (or set `AI_PROVIDER=claude` and `ANTHROPIC_API_KEY`). Set a private `ADMIN_PASSWORD` if you want moderator tools.
 2. Run `npm install`.
 3. Run `node --env-file=.env server.js` and open http://localhost:3000. (Node 20.6+.)
 (Without a key a FAKE AI is used, for testing only.)
@@ -13,8 +13,8 @@ AI scoring, leaderboard. Everything runs on the server, so friends only need the
 - Sign in or register to post in the public fan room. Text, links, up to five images/videos per message are supported; there is no app-level video duration or file-size cap.
 - Instagram/Reels links open on Instagram. Instagram controls whether a Reel can be embedded elsewhere.
 - Set `ADMIN_PASSWORD` on the server. The Moderator button appears once it is configured; sign in there to delete messages, block members from fan chat, or unblock them.
-- Chat posts are saved in MongoDB. Uploaded media is saved in the `fan-media` folder beside `server.js`. Keep that folder on persistent storage when deploying so uploaded media survives restarts.
-- Actual upload size/length is limited by available disk space and the hosting provider's request limits. On Render, mount a persistent disk and keep `fan-media` on that disk.
+- Chat posts and Cloudinary media references are saved in MongoDB. Uploaded photos and videos are stored in Cloudinary, so Render does not need a persistent disk for chat uploads.
+- Cloudinary and its account plan enforce upload size, format, and storage limits.
 
 ## Role-play safety and references
 - Role-play is text-only; its server rejects image/video attachments.
@@ -27,7 +27,7 @@ AI scoring, leaderboard. Everything runs on the server, so friends only need the
 ## Put online (Render.com, simplest)
 1. Upload this folder to a GitHub repo.
 2. Render -> New -> Web Service -> pick the repo. Build: `npm install`  Start: `npm start`
-3. Environment: add MONGODB_URI, AI_PROVIDER=gemini, GEMINI_API_KEY, and a private ADMIN_PASSWORD. For Claude instead, use AI_PROVIDER=claude and ANTHROPIC_API_KEY. Add a Disk mounted at /data and set MEDIA_DIR=/data/fan-media so uploaded chat media survives redeploys.
+3. Environment: add MONGODB_URI, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, AI_PROVIDER=gemini, GEMINI_API_KEY, and a private ADMIN_PASSWORD. Get the Cloudinary values from your Cloudinary dashboard. For Claude instead, use AI_PROVIDER=claude and ANTHROPIC_API_KEY. No Render disk is required for chat uploads.
 4. Share the Render URL. Put your own logo as `public/logo.png` (clicking it opens Register).
 
 ## Notes

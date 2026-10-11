@@ -2,6 +2,8 @@
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { MongoClient, ObjectId } from 'mongodb';
+import { v2 as cloudinary } from 'cloudinary';
+import { createCloudinaryStorage } from './cloudinary-storage.js';
 import crypto from 'crypto';
 import http from 'http';
 import path from 'path';
@@ -11,8 +13,8 @@ import { fileURLToPath } from 'url';
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
-const MEDIA_DIR = process.env.MEDIA_DIR || path.join(__dir, 'fan-media');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const CLOUDINARY_CONFIGURED = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
 const GKEY = process.env.GEMINI_API_KEY;
 const KEY = process.env.ANTHROPIC_API_KEY;
 const PROVIDER = process.env.AI_PROVIDER || (GKEY && !KEY ? 'gemini' : 'claude'); // 'gemini' (free tier) or 'claude'
@@ -22,7 +24,14 @@ const JUDGES = +process.env.JUDGES || (PROVIDER === 'gemini' ? 1 : 2);
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-5-5';
 const FAKE = PROVIDER === 'gemini' ? !GKEY : !KEY; // no key = fake AI for local testing only
 const TEST_SECONDS = +process.env.TEST_SECONDS || 0;
-fs.mkdirSync(MEDIA_DIR, { recursive: true });
+if (CLOUDINARY_CONFIGURED) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true,
+  });
+} else console.warn('Cloudinary is not configured. Chat photo/video uploads are disabled.');
 if (FAKE) console.warn('WARNING: no API key set for provider ' + PROVIDER + '. Using FAKE AI (testing only).');
 else console.log('AI provider:', PROVIDER);
 
@@ -60,7 +69,6 @@ app.use(express.json({ limit: '10kb' }));
 const page = f => (req, res) => { const base = `${req.protocol}://${req.get('host')}`; res.type('html').send(fs.readFileSync(path.join(__dir, 'public', f), 'utf8').replaceAll('__BASE__', base)); };
 app.get(['/', '/index.html'], page('index.html'));
 app.get('/p', page('poster.html'));
-app.use('/uploads', express.static(MEDIA_DIR, { index: false, setHeaders: res => res.setHeader('X-Content-Type-Options', 'nosniff') }));
 app.use(express.static(path.join(__dir, 'public')));
 const setCookie = (req, res, t) => res.setHeader('Set-Cookie', `sid=${t}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${req.secure ? '; Secure' : ''}`);
 const pubUser = u => ({ name: u.name, id: u.pub, wins: u.wins });
@@ -92,18 +100,17 @@ app.get('/api/me', async (req, res) => { try { const u = await userBySid(cookie(
 // ---------- public fan chat ----------
 const mediaExtensions = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif', 'image/avif': '.avif', 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'video/ogg': '.ogv' };
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, MEDIA_DIR),
-    filename: (_req, file, cb) => cb(null, crypto.randomBytes(18).toString('hex') + mediaExtensions[file.mimetype]),
-  }),
-  fileFilter: (_req, file, cb) => Object.hasOwn(mediaExtensions, file.mimetype) ? cb(null, true) : cb(new Error('Attach an image or video file.')),
+  storage: createCloudinaryStorage(cloudinary),
+  fileFilter: (_req, file, cb) => {
+    if (!CLOUDINARY_CONFIGURED) return cb(Object.assign(new Error('Photo/video uploads are not configured. Add the Cloudinary environment variables in Render.'), { status: 503 }));
+    if (!Object.hasOwn(mediaExtensions, file.mimetype)) return cb(new Error('Attach an image or video file.'));
+    cb(null, true);
+  },
 });
-const removeUploadedFiles = files => Promise.all(files.map(file => fs.promises.rm(file.path, { force: true })));
-const uploadFanMedia = (req, res, next) => upload.array('media', 5)(req, res, async error => {
+const uploadFanMedia = (req, res, next) => upload.array('media', 5)(req, res, error => {
   if (error) {
-    try { await removeUploadedFiles(req.files || []); }
-    catch (cleanupError) { console.error(cleanupError); return res.status(500).json({ error: 'Could not clean up the uploaded files.' }); }
-    return res.status(400).json({ error: error.message });
+    if (error.status !== 503) console.error(error);
+    return res.status(error.status || 400).json({ error: error.status === 503 ? error.message : error.message || 'Could not upload media.' });
   }
   next();
 });
@@ -124,7 +131,7 @@ app.get('/api/fan-chat', async (_req, res) => {
     const names = new Map(users.map(user => [user._id, user.name]));
     const messages = posts.reverse().filter(post => names.has(post.uid)).map(post => ({
       id: post._id.toString(), uid: post.uid, name: names.get(post.uid), body: post.body, created_at: post.createdAt.getTime(),
-      media: (post.media || []).map(file => ({ id: file.id, url: '/uploads/' + file.filename, name: file.name, mime: file.mime })),
+      media: (post.media || []).map(file => ({ id: file.id, url: file.url, name: file.name, mime: file.mime })),
     }));
     const [{ members = 0 } = {}] = await FanChat.aggregate([{ $group: { _id: '$uid' } }, { $count: 'members' }]).toArray();
     res.json({ messages, members });
@@ -133,23 +140,32 @@ app.get('/api/fan-chat', async (_req, res) => {
 app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
   const body = String(req.body?.body || '').trim().slice(0, 4000);
   const files = req.files || [];
-  const discardFiles = async () => {
-    try { await removeUploadedFiles(files); }
-    catch (error) { console.error(error); }
-  };
-  if (!body && !files.length) { await discardFiles(); return res.status(400).json({ error: 'Write a message or attach media.' }); }
+  if (!body && !files.length) return res.status(400).json({ error: 'Write a message or attach media.' });
   try {
     const last = await FanChat.findOne({ uid: req.user._id }, { sort: { createdAt: -1 } });
     if (last && Date.now() - last.createdAt.getTime() < 1000) {
-      await discardFiles();
+      await Promise.all(files.map(file => cloudinary.uploader.destroy(file.filename, { resource_type: file.resourceType, invalidate: true })));
       return res.status(429).json({ error: 'Please wait a moment before posting again.' });
     }
     await FanChat.insertOne({
       uid: req.user._id, body, createdAt: new Date(),
-      media: files.map(file => ({ id: crypto.randomBytes(12).toString('hex'), filename: file.filename, name: path.basename(file.originalname).slice(0, 180), mime: file.mimetype })),
+      media: files.map(file => ({
+        id: crypto.randomBytes(12).toString('hex'),
+        publicId: file.filename,
+        url: file.path,
+        resourceType: file.resourceType,
+        name: path.basename(file.originalname).slice(0, 180),
+        mime: file.mimetype,
+      })),
     });
     res.status(201).json({ ok: true });
-  } catch (error) { await discardFiles(); console.error(error); res.status(500).json({ error: 'Message could not be sent.' }); }
+  } catch (error) {
+    try {
+      await Promise.all(files.map(file => cloudinary.uploader.destroy(file.filename, { resource_type: file.resourceType, invalidate: true })));
+    } catch (cleanupError) { console.error(cleanupError); }
+    console.error(error);
+    res.status(500).json({ error: 'Message could not be sent.' });
+  }
 });
 
 // ---------- moderator tools ----------
@@ -200,7 +216,7 @@ app.delete('/api/admin/messages/:id', requireAdmin, async (req, res) => {
     const post = await FanChat.findOne({ _id: id });
     if (!post) return res.status(404).json({ error: 'Message not found.' });
     await FanChat.deleteOne({ _id: id });
-    await Promise.all((post.media || []).map(file => fs.promises.rm(path.join(MEDIA_DIR, file.filename), { force: true })));
+    await Promise.all((post.media || []).map(file => cloudinary.uploader.destroy(file.publicId, { resource_type: file.resourceType, invalidate: true })));
     res.json({ ok: true });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete this message.' }); }
 });
