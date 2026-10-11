@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta property="og:title" content="Karan Patel Fans Community"><meta property="og:description" content="Join the public Karan Patel fan chat, share posts and reels, or play role-play games. Fan-made."><meta property="og:image" content="__BASE__/logo.png"><meta property="og:url" content="__BASE__/"><meta name="twitter:card" content="summary_large_image">
+<title>Karan Patel Fans Community (Fan-made)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');
+:root{--paper:#f4f6f2;--surface:#fff;--ink:#17282d;--muted:#68777a;--coral:#e65343;--coral-soft:#fff0e8;--teal:#145b62;--teal-soft:#e4f1ed;--lime:#e5ef9f;--sky:#dceef2;--line:#dce4df;--yellow:#f4c85a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 'DM Sans',sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:1220px;margin:0 auto;padding:24px clamp(14px,3vw,34px)}
+h1,h2,h3,p{margin-top:0}h1,h2{font-family:'DM Serif Display',Georgia,serif;font-weight:400;line-height:1.15}h1{font-size:2.25rem;margin:.15em 0}h2{font-size:1.35rem;margin:0 0 12px}h3{font-size:1rem;margin:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:18px;margin:0}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.chip,button,input,select,textarea{font:inherit;color:var(--ink)}
+.chip{padding:8px 12px;border:1px solid var(--line);background:#fff;border-radius:4px;cursor:pointer;transition:background .15s,border-color .15s}
+.chip.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid #cad5d0;border-radius:4px;background:#fff;outline-color:var(--teal)}
+textarea{min-height:88px;resize:vertical}
+.btn{background:var(--coral);color:#fff;border:0;padding:11px 16px;border-radius:4px;cursor:pointer;font-weight:700;transition:filter .15s,transform .15s}
+.btn:hover{filter:brightness(.94);transform:translateY(-1px)}.btn.alt{background:transparent;color:var(--teal);border:1px solid var(--teal)}
+.small{font-size:.85rem;color:var(--muted)}.hide{display:none!important}.row{display:flex;gap:9px;align-items:center;margin:4px 0}
+#auth{max-width:490px;margin:8vh auto}.auth-brand{display:flex;align-items:center;gap:14px;margin:0 0 22px}.brand-mark{width:58px;height:58px;display:grid;place-items:center;background:var(--coral);color:#fff;font:bold 21px 'DM Serif Display',Georgia,serif;transform:rotate(-4deg);border-radius:5px}.auth-brand h1{font-size:1.7rem}
+.masthead{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:4px 0 20px;border-bottom:1px solid var(--line);margin-bottom:24px}.brand-lockup{display:flex;gap:12px;align-items:center}.brand-lockup .brand-mark{width:44px;height:44px;font-size:17px}.brand-lockup strong{display:block;font-size:15px}.account{display:flex;align-items:center;gap:12px}.account-name{font-weight:700}.account-name:before{content:"";display:inline-block;width:9px;height:9px;margin-right:7px;background:#62a878;border-radius:50%}
+.fan-intro{background:var(--teal);color:#fff;padding:24px 28px;margin-bottom:17px;display:flex;align-items:end;justify-content:space-between;gap:18px;border-radius:7px;position:relative;overflow:hidden}.fan-intro:after{content:"KP";position:absolute;right:22%;top:-40px;font:150px/.9 'DM Serif Display',Georgia,serif;color:rgba(255,255,255,.055);transform:rotate(-9deg);pointer-events:none}.eyebrow{text-transform:uppercase;font-size:11px;letter-spacing:1.5px;font-weight:700;color:var(--lime);margin:0 0 7px}.fan-intro h1{font-size:2.2rem;margin:0 0 4px}.fan-intro p{margin:0;color:#d2e4df}.room-count{flex:0 0 auto;z-index:1;text-align:right;color:#e6f1d4;font-size:13px}.live-dot{display:inline-block;width:8px;height:8px;background:#c5e877;border-radius:50%;margin-right:6px}
+.community-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(290px,.8fr);align-items:start;gap:18px}.side-stack{display:grid;gap:14px}.side-stack .card{padding:17px}.section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.section-title h2{margin:0}.tag{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--teal);font-weight:700;background:var(--teal-soft);padding:4px 8px;border-radius:3px}
+#fanRoom{padding:0;overflow:hidden}.chat-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 20px;border-bottom:1px solid var(--line)}.chat-title{display:flex;align-items:center;gap:11px}.chat-badge{width:37px;height:37px;display:grid;place-items:center;background:var(--yellow);border-radius:50%;font-weight:700;color:var(--ink)}.chat-head .small{margin:2px 0 0}.text-btn{border:0;background:transparent;color:var(--teal);font-weight:700;cursor:pointer;padding:7px}
+#fanMessages{display:flex;flex-direction:column;gap:12px;min-height:310px;height:min(55vh,600px);overflow:auto;padding:18px;background-color:#f7f9f5;background-image:repeating-linear-gradient(135deg,transparent 0 24px,rgba(20,91,98,.025) 24px 25px)}.empty-chat{margin:auto;text-align:center;color:var(--muted);max-width:270px}.empty-chat strong{display:block;color:var(--teal);font:1.2rem 'DM Serif Display',Georgia,serif;margin-bottom:4px}
+.fan-message{display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;max-width:100%;animation:arrive .18s ease-out}.avatar{width:34px;height:34px;display:grid;place-items:center;border-radius:50%;background:var(--sky);color:var(--teal);font-weight:700;font-size:12px}.message-main{min-width:0}.message-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 3px}.message-name{font-weight:700;font-size:13px}.message-time{font-size:11px;color:var(--muted)}.message-body{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 6px}.message-body a{color:#126b79;text-decoration-thickness:1px;text-underline-offset:2px}.message-media{display:flex;flex-direction:column;gap:8px;max-width:min(100%,520px)}.message-media img,.message-media video{display:block;max-width:100%;max-height:420px;object-fit:contain;border-radius:5px;background:#e8eeeb}.message-media video{width:min(100%,500px)}.moderation-tools{display:flex;gap:4px;margin-left:auto}.mini-action{padding:3px 7px;border:1px solid var(--line);border-radius:3px;background:#fff;color:var(--muted);font-size:11px;cursor:pointer}.mini-action:hover{border-color:var(--coral);color:var(--coral)}
+.chat-compose{padding:14px 16px;border-top:1px solid var(--line);background:#fff}.compose-row{display:flex;gap:9px;align-items:end}.compose-row textarea{min-height:45px;max-height:150px;flex:1}.compose-actions{display:flex;gap:8px;align-items:center}.attach-btn{display:inline-flex;align-items:center;justify-content:center;min-height:43px;padding:0 12px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--teal);font-weight:700;cursor:pointer}.attach-btn:hover{background:var(--teal-soft)}.file-note{min-height:18px;padding-top:4px;font-size:12px;color:var(--muted)}.chat-status{font-size:12px;color:var(--coral);min-height:18px;margin:2px 0 0}
+.mode-card{background:var(--sky)}.show-card{background:#fff4dc}.game-card{background:var(--coral-soft)}#showBox{margin-top:14px}.side-stack input,.side-stack select{margin-top:7px}.side-stack h2:not(:first-child){margin-top:17px}.leader-card{background:var(--lime)}.warn{border-left:4px solid var(--coral);font-size:13px;line-height:1.55}
+.bar{display:flex;justify-content:space-between;align-items:center;position:sticky;top:env(safe-area-inset-top);background:var(--paper);padding:7px 0;z-index:2}#timer{font-weight:700;color:var(--coral);font-variant-numeric:tabular-nums}.score{font-size:3rem;font-weight:800;color:var(--coral);margin:0}#chat{display:flex;flex-direction:column;gap:8px;min-height:40vh;max-height:58vh;overflow-y:auto}.m{padding:8px 12px;border-radius:5px;max-width:88%;white-space:pre-wrap;border:1px solid var(--line);background:#fff}.m.me{align-self:flex-end;background:var(--teal-soft)}#logo{width:84px;height:84px;border-radius:50%;object-fit:cover;border:2px solid var(--coral);cursor:pointer}.ph{width:84px;height:84px;border-radius:50%;border:2px dashed var(--coral);display:flex;align-items:center;justify-content:center;font-size:11px;text-align:center;color:var(--muted);cursor:pointer}
+dialog{width:min(440px,calc(100% - 28px));padding:0;border:1px solid var(--line);border-radius:7px;color:var(--ink);box-shadow:0 20px 70px #102a2b40}dialog::backdrop{background:#102a2b88}.dialog-inner{padding:22px}.dialog-inner input{margin:10px 0}.blocked-user{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+@keyframes arrive{from{opacity:.6;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:780px){main{padding:15px}.community-layout{grid-template-columns:1fr}.fan-intro{padding:20px}.fan-intro:after{right:5%;font-size:115px}.side-stack{grid-template-columns:repeat(2,minmax(0,1fr))}.side-stack .game-card{grid-column:1/-1}}
+@media(max-width:520px){main{padding:11px}.masthead{align-items:flex-start}.account{gap:7px;flex-direction:column;align-items:flex-end}.account .btn{padding:7px 10px}.fan-intro{align-items:flex-start;flex-direction:column}.fan-intro h1{font-size:1.7rem}.room-count{text-align:left}.chat-head{padding:13px}.chat-compose{padding:11px}.compose-row{align-items:stretch;flex-direction:column}.compose-actions{justify-content:space-between}.attach-btn{flex:1}.side-stack{grid-template-columns:1fr}.side-stack .game-card{grid-column:auto}.auth-brand h1{font-size:1.4rem}}
+</style></head><body><main>
+
+<div id="auth">
+  <div class="auth-brand"><a id="logoLink" title="Click to register" style="text-decoration:none"><span class="brand-mark">KP</span></a><div><h1>Karan Patel Fan Club</h1><div class="small">Role-play · community · fans chat</div></div></div>
+  <div class="card" id="regCard">
+    <h2 id="authTitle">Login</h2>
+    <p class="small">Sign in to play together, share posts and reels, and join the public Karan Patel fans chat.</p>
+    <input id="aname" placeholder="Your name" autocomplete="username">
+    <input id="apass" type="password" placeholder="Password (min 6 characters)" autocomplete="current-password" style="margin-top:8px">
+    <p><button class="btn" id="abtn">Login</button> <button class="btn alt" id="aswitch">New here? Register</button></p>
+    <div class="small" id="aerr"></div>
+    <div class="small" style="margin-top:8px">Your game chat is sent to an AI provider to generate replies and scores. The provider (e.g. Google's free tier) may use it to improve its products. Please do not share personal information.</div>
+  </div>
+</div>
+
+<div id="home" class="hide">
+  <header class="masthead"><div class="brand-lockup"><span class="brand-mark">KP</span><div><strong>Karan Patel Fan Club</strong><span class="small">A fan-made community</span></div></div><div class="account"><span><span class="account-name" id="me"></span> <span class="small" id="myid"></span></span><button class="btn alt" id="logout">Log out</button></div></header>
+  <section class="fan-intro"><div><p class="eyebrow">Fans, stories &amp; everything Karan</p><h1>Welcome to the fan room.</h1><p>Share a moment, a memory, or the latest reel.</p></div><div class="room-count"><span class="live-dot"></span><span id="fanCount">Community chat</span></div></section>
+  <div class="community-layout">
+    <section class="card" id="fanRoom" aria-label="Public fans chat">
+      <div class="chat-head"><div class="chat-title"><span class="chat-badge">KP</span><div><h2>Karan Patel Fans</h2><p class="small">Public community conversation</p></div></div><button class="text-btn" id="adminOpen" type="button">Moderator</button></div>
+      <div id="fanMessages" aria-live="polite"><div class="empty-chat"><strong>Room is warming up</strong>Start the conversation with the fans.</div></div>
+      <form class="chat-compose" id="fanForm"><textarea id="fanText" maxlength="4000" placeholder="Write a message or paste a link..." aria-label="Message"></textarea><div class="compose-row"><div class="file-note" id="fileNote">Attach up to 5 photos/videos to one message</div><div class="compose-actions"><input class="hide" id="fanFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,video/ogg" multiple><button class="attach-btn" id="attachMedia" type="button">Add media</button><button class="btn" type="submit" id="fanSend">Send</button></div></div><div class="chat-status" id="fanStatus" role="status"></div></form>
+    </section>
+    <aside class="side-stack">
+      <section class="card mode-card"><div class="section-title"><h2>Play together</h2><span class="tag">Role-play</span></div><div class="opts" id="modes"></div></section>
+      <section class="card show-card" id="showBox"><h2>Choose a show</h2><div class="opts" id="shows"></div><input id="showCustom" placeholder="Or type another show / project"></section>
+      <section class="card game-card"><h2 id="charH">Your character</h2><input id="char" placeholder="e.g. Raman Bhalla, Mr. Bajaj..."><h2>Language</h2><input id="lang" value="Hinglish" placeholder="Hindi, Hinglish, English..."><h2>Game length</h2><select id="mins"><option>2</option><option selected>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select><p class="row" style="margin-top:12px"><button class="btn" id="solo">Play solo</button><button class="btn alt" id="host">Host a game</button></p><div class="small" id="err" style="color:#a83327"></div></section>
+      <section class="card"><h2>Join a game</h2><div class="row"><input id="code" placeholder="Game ID"><button class="btn alt" id="joinc">Join</button></div><h2 style="margin-top:18px">Open games</h2><div id="open" class="small">None right now.</div></section>
+      <section class="card leader-card"><h2>Top players</h2><div id="board" class="small">No wins yet.</div></section>
+      <section class="card warn"><b>Fan-made game.</b> Not affiliated with or endorsed by Karan Patel or his team. AI replies and scores may be inaccurate and do not represent any real person's words or opinions.</section>
+    </aside>
+  </div>
+  <dialog id="modDialog"><div class="dialog-inner"><div class="section-title"><h2>Moderator access</h2><button class="text-btn" id="modClose" type="button" aria-label="Close">Close</button></div><form id="modForm"><label class="small" for="modPassword">Moderator password</label><input id="modPassword" type="password" autocomplete="current-password" required><button class="btn" id="modSubmit" type="submit">Sign in</button><div class="chat-status" id="modStatus" role="status"></div></form><div id="modTools" class="hide"><div class="section-title" style="margin-top:20px"><h3>Blocked members</h3><button class="text-btn" id="modLogout" type="button">Sign out</button></div><div id="blockedList"></div></div></div></dialog>
+</div>
+
+<div id="lobby" class="hide">
+  <div class="card"><div class="small">Game ID (share with friends)</div><h1 id="gid"></h1><div id="ginfo" class="small"></div></div>
+  <div class="card"><h2>Players</h2><div id="plist"></div><div class="small">All other characters will be played by AI.</div></div>
+  <div class="card hide" id="reqs"><h2>Join requests</h2><div id="rlist"></div></div>
+  <p><button class="btn hide" id="go">Start game for everyone</button> <button class="btn alt" id="leave">Leave</button></p>
+  <div class="small" id="lmsg"></div>
+</div>
+
+<div id="play" class="hide">
+  <div class="bar"><div><b id="title"></b><div class="small" id="sub"></div></div><div id="timer">00:00</div></div>
+  <div id="chat"></div>
+  <div class="row"><input id="msg" maxlength="500" placeholder="Type your dialogue... use (brackets) for actions"><button class="btn" id="send">Send</button></div>
+  <div class="small">Role-play is text-only; images and videos cannot be sent here.</div>
+  <p><button class="btn alt hide" id="end">End game now (host)</button></p>
+</div>
+
+<div id="result" class="hide">
+  <div class="card hide" id="topc"></div>
+  <div class="card"><div class="small">Your performance (only you can see this)</div><p class="score" id="pct"></p><div id="verdict"><b></b></div></div>
+  <div class="card"><h2>Feedback</h2><div id="fb"></div></div>
+  <button class="btn" id="again">Back to home</button>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const mk=(p,tag,t)=>{const e=document.createElement(tag);if(t!=null)e.textContent=t;p.appendChild(e);return e};
+const MODES={serial:"Serial Role-Play",quiz:"Karan Patel Quiz"};
+const SHOWS=["Yeh Hai Mohabbatein","Kasautii Zindagii Kay","Kuch Toh Log Kahenge","Qayamat Ki Raat","Ek Hasina Thi","Ishq Mein Marjawan"];
+let ws,me=null,mode="serial",show="",G=null,tId=null,off=0,regMode=false,shown="",fanPoll=null,isModerator=false;
+const screen=n=>["auth","home","lobby","play","result"].forEach(s=>$(s).classList.toggle("hide",s!==n));
+
+// ---- auth ----
+function setReg(r){regMode=r;$("authTitle").textContent=r?"Register":"Login";$("abtn").textContent=r?"Register":"Login";$("aswitch").textContent=r?"Have an account? Login":"New here? Register";$("apass").autocomplete=r?"new-password":"current-password"}
+$("aswitch").onclick=()=>setReg(!regMode);$("logoLink").onclick=e=>{e.preventDefault();setReg(true);$("aname").focus()};
+$("abtn").onclick=async()=>{
+  const r=await fetch("/api/"+(regMode?"register":"login"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name:$("aname").value,password:$("apass").value})});
+  const j=await r.json();if(!r.ok){$("aerr").textContent=j.error;return}enter(j)};
+$("logout").onclick=async()=>{await fetch("/api/logout",{method:"POST"});location.reload()};
+(async()=>{const r=await fetch("/api/me");if(r.ok)enter(await r.json())})();
+function enter(u){me=u;$("me").textContent=u.name;$("myid").textContent="(ID "+u.id+")";screen("home");connect();loadFanChat();refreshModerator();clearInterval(fanPoll);fanPoll=setInterval(loadFanChat,5000)}
+
+function appendLinks(parent,text){
+  const pattern=/(https?:\/\/|www\.)[^\s<>]+/gi;let cursor=0;
+  for(const match of text.matchAll(pattern)){
+    const start=match.index;parent.append(document.createTextNode(text.slice(cursor,start)));
+    let value=match[0],tail="";while(/[.,!?;:)\]]$/.test(value)){tail=value.slice(-1)+tail;value=value.slice(0,-1)}
+    const link=document.createElement("a");link.href=value.startsWith("www.")?"https://"+value:value;link.target="_blank";link.rel="noopener noreferrer";link.textContent=value;
+    parent.append(link,document.createTextNode(tail));cursor=start+match[0].length;
+  }
+  parent.append(document.createTextNode(text.slice(cursor)));
+}
+function makeFanPost(post){
+  const article=document.createElement("article");article.className="fan-message";article.dataset.chatId=post.id;
+  const avatar=document.createElement("div");avatar.className="avatar";avatar.textContent=(post.name||"F").slice(0,1).toUpperCase();article.append(avatar);
+  const main=document.createElement("div");main.className="message-main";const meta=document.createElement("div");meta.className="message-meta";
+  const name=document.createElement("span");name.className="message-name";name.textContent=post.name;
+  const time=document.createElement("time");time.className="message-time";time.dateTime=new Date(post.created_at).toISOString();time.textContent=new Date(post.created_at).toLocaleString();meta.append(name,time);
+  if(isModerator){
+    const tools=document.createElement("div");tools.className="moderation-tools";
+    const del=document.createElement("button");del.className="mini-action";del.textContent="Delete";del.title="Delete this message";del.onclick=()=>moderate(`/api/admin/messages/${post.id}`,"DELETE","Delete this message?");tools.append(del);
+    if(post.name!==me.name){const block=document.createElement("button");block.className="mini-action";block.textContent="Block";block.title="Block this member from public chat";block.onclick=()=>moderate(`/api/admin/blocks/${post.uid}`,"POST",`Block ${post.name} from public chat?`);tools.append(block)}
+    meta.append(tools);
+  }
+  main.append(meta);
+  if(post.body){const body=document.createElement("p");body.className="message-body";appendLinks(body,post.body);main.append(body)}
+  if(post.media?.length){
+    const media=document.createElement("div");media.className="message-media";
+    post.media.forEach(item=>{
+      if(item.mime.startsWith("image/")){const anchor=document.createElement("a");anchor.href=item.url;anchor.target="_blank";anchor.rel="noopener noreferrer";const image=document.createElement("img");image.src=item.url;image.alt=item.name;anchor.append(image);media.append(anchor)}
+      else{const video=document.createElement("video");video.controls=true;video.preload="metadata";video.playsInline=true;const source=document.createElement("source");source.src=item.url;source.type=item.mime;video.append(source);media.append(video)}
+    });
+    main.append(media);
+  }
+  article.append(main);return article;
+}
+async function loadFanChat(force=false){
+  try{
+    const response=await fetch("/api/fan-chat");if(!response.ok)return;const data=await response.json(),box=$("fanMessages"),nearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<100,ids=new Set(data.messages.map(post=>String(post.id)));
+    if(force)box.replaceChildren();
+    [...box.querySelectorAll(".fan-message")].forEach(node=>{if(!ids.has(node.dataset.chatId))node.remove()});
+    if(!data.messages.length&&!box.querySelector(".empty-chat")){const empty=document.createElement("div");empty.className="empty-chat";const title=document.createElement("strong");title.textContent="Room is warming up";empty.append(title,document.createTextNode("Start the conversation with the fans."));box.append(empty)}
+    else if(data.messages.length)box.querySelector(".empty-chat")?.remove();
+    data.messages.forEach(post=>{if(!box.querySelector(`[data-chat-id="${post.id}"]`))box.append(makeFanPost(post))});
+    $("fanCount").textContent=`${data.members} fan${data.members===1?"":"s"} in the room`;if(nearBottom)box.scrollTop=box.scrollHeight;
+  }catch{$("fanStatus").textContent="Couldn't load the chat. Retrying..."}
+}
+async function refreshModerator(){
+  try{const response=await fetch("/api/admin/session"),state=await response.json(),changed=isModerator!==state.authenticated;isModerator=state.authenticated;$("adminOpen").classList.toggle("hide",!state.configured);$("modForm").classList.toggle("hide",isModerator);$("modTools").classList.toggle("hide",!isModerator);if(changed)loadFanChat(true);if(isModerator)loadBlocked()}catch{}
+}
+async function loadBlocked(){
+  try{const response=await fetch("/api/admin/blocks"),data=await response.json(),list=$("blockedList");list.replaceChildren();if(!response.ok)return;
+    data.users.forEach(user=>{const row=document.createElement("div");row.className="blocked-user";const name=document.createElement("span");name.textContent=user.name;const button=document.createElement("button");button.className="mini-action";button.textContent="Unblock";button.onclick=()=>moderate(`/api/admin/blocks/${user.id}`,"DELETE",`Unblock ${user.name}?`);row.append(name,button);list.append(row)});
+    if(!data.users.length)list.textContent="No blocked members.";
+  }catch{}
+}
+async function moderate(url,method,question){
+  if(!confirm(question))return;const response=await fetch(url,{method});if(!response.ok){const data=await response.json();$("modStatus").textContent=data.error||"Moderation action failed.";return}await loadFanChat(true);await loadBlocked();
+}
+$("adminOpen").onclick=()=>$("modDialog").showModal();$("modClose").onclick=()=>$("modDialog").close();
+$("modForm").onsubmit=async event=>{event.preventDefault();const response=await fetch("/api/admin/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:$("modPassword").value})}),data=await response.json();if(!response.ok){$("modStatus").textContent=data.error;return}$("modPassword").value="";await refreshModerator()};
+$("modLogout").onclick=async()=>{await fetch("/api/admin/logout",{method:"POST"});isModerator=false;await refreshModerator()};
+$("attachMedia").onclick=()=>$("fanFiles").click();
+$("fanFiles").onchange=()=>{$("fileNote").textContent=$("fanFiles").files.length?`${$("fanFiles").files.length} file${$("fanFiles").files.length===1?"":"s"} selected`:"Attach up to 5 photos/videos to one message"};
+$("fanForm").onsubmit=async event=>{
+  event.preventDefault();$("fanStatus").textContent="";const form=new FormData();form.set("body",$("fanText").value);[...$("fanFiles").files].forEach(file=>form.append("media",file));$("fanSend").disabled=true;
+  try{const response=await fetch("/api/fan-chat",{method:"POST",body:form}),data=await response.json();if(!response.ok){$("fanStatus").textContent=data.error||"Message could not be sent.";return}$("fanText").value="";$("fanFiles").value="";$("fileNote").textContent="Attach up to 5 photos/videos to one message";await loadFanChat(true)}
+  catch{$("fanStatus").textContent="Message could not be sent. Check your connection."}
+  finally{$("fanSend").disabled=false}
+};
+
+// ---- home ----
+function chips(el,list,cb,sel){el.innerHTML="";list.forEach(([k,v])=>{const b=mk(el,"button",v);b.className="chip"+(k===sel?" on":"");b.onclick=()=>{[...el.children].forEach(c=>c.classList.remove("on"));b.classList.add("on");cb(k)}})}
+chips($("modes"),Object.entries(MODES),k=>{mode=k;$("showBox").classList.toggle("hide",k!=="serial");$("charH").textContent=k==="serial"?"3. Your character":"3. Your name";},"serial");
+chips($("shows"),SHOWS.map(s=>[s,s]),k=>{show=k;$("showCustom").value=""});
+$("showCustom").oninput=()=>{show=$("showCustom").value;[...$("shows").children].forEach(c=>c.classList.remove("on"))};
+const form=()=>({mode,show:(show||$("showCustom").value).trim(),char:$("char").value.trim(),lang:$("lang").value,mins:+$("mins").value});
+const tx=o=>ws&&ws.readyState===1?ws.send(JSON.stringify(o)):($("err").textContent="Connecting... try again.");
+$("solo").onclick=()=>tx({t:"host",solo:true,...form()});
+$("host").onclick=()=>tx({t:"host",...form()});
+$("joinc").onclick=()=>tx({t:"join",gid:$("code").value.trim().toUpperCase(),char:$("char").value.trim()});
+
+// ---- websocket ----
+function connect(){
+  ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
+  ws.onclose=e=>{if(e.code===4001){location.reload();return}setTimeout(()=>me&&connect(),1500)};
+  ws.onmessage=e=>{const m=JSON.parse(e.data);({lobby,game,msg,history,result,err,kicked})[m.t]?.(m)};
+}
+function lobby(m){
+  const o=$("open");o.innerHTML="";if(!m.list.length)o.textContent="None right now.";
+  m.list.forEach(g=>{const r=mk(o,"div");r.className="row";mk(r,"span",`${g.host} is starting "${g.title}" (${g.mins} min, ${g.n} in) · ID ${g.id}`).style.flex="1";const b=mk(r,"button","Request to join");b.className="btn alt";b.onclick=()=>tx({t:"join",gid:g.id,char:$("char").value.trim()})});
+  const bd=$("board");bd.innerHTML="";if(!m.board.length)bd.textContent="No wins yet.";m.board.forEach((u,i)=>mk(bd,"div",`${i+1}. ${u.name} (ID ${u.pub}) — ${u.wins} wins`));
+}
+function err(m){$("err").textContent=m.e;if(!$("home").classList.contains("hide"))window.scrollTo(0,0)}
+function kicked(){G=null;screen("home");$("err").textContent="The host did not accept your request, or the game was cancelled."}
+function game(m){
+  G=m.g;off=G.now-Date.now();const mine=G.players.find(p=>p.uid===undefined)||null;
+  const isHost=me&&G.players.some(p=>p.name===me.name&&p.uid===G.host);
+  if(G.status==="lobby"){screen("lobby");drawLobby(isHost)}
+  else if(G.status==="live"){if(shown!==G.id){shown=G.id;$("chat").innerHTML=""}screen("play");$("title").textContent=G.title+(G.solo?"":" · multiplayer");const p=G.players.find(x=>x.name===me.name);$("sub").textContent="You are: "+(p?p.char:"");$("end").classList.toggle("hide",!isHost||G.solo&&false);clearInterval(tId);tick();tId=setInterval(tick,500)}
+  else if(G.status==="scoring"){clearInterval(tId);$("timer").textContent="Scoring…";screen("result");$("pct").textContent="…";$("verdict").firstChild.textContent="Judging your performance carefully...";$("fb").innerHTML="";$("topc").classList.add("hide")}
+}
+const fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+function tick(){const s=Math.max(0,Math.round((G.endsAt-(Date.now()+off))/1000));$("timer").textContent=fmt(s)}
+function drawLobby(isHost){
+  $("gid").textContent=G.id;$("ginfo").textContent=`${G.title} · ${G.mins} min`;
+  const pl=$("plist"),rq=$("rlist");pl.innerHTML="";rq.innerHTML="";
+  G.players.forEach(p=>{if(p.status==="joined")mk(pl,"div",`${p.name} → ${p.char}${p.name===me.name?" (you)":""}`);
+    else if(isHost){const r=mk(rq,"div");r.className="row";mk(r,"span",`${p.name} wants to play ${p.char}`).style.flex="1";const a=mk(r,"button","Accept");a.className="btn";a.onclick=()=>tx({t:"accept",gid:G.id,uid:p.uid});const x=mk(r,"button","Reject");x.className="btn alt";x.onclick=()=>tx({t:"reject",gid:G.id,uid:p.uid})}});
+  $("reqs").classList.toggle("hide",!rq.children.length);$("go").classList.toggle("hide",!isHost);
+  const mine=G.players.find(p=>p.name===me.name);
+  $("lmsg").textContent=isHost?"Share the Game ID. Only you can start the game.":mine&&mine.status==="requested"?"Waiting for the host to accept...":"You are in. Waiting for the host to start.";
+}
+$("go").onclick=()=>tx({t:"start",gid:G.id});$("leave").onclick=()=>{tx({t:"leave",gid:G.id});G=null;screen("home")};$("end").onclick=()=>confirm("End the game for everyone and get scores?")&&tx({t:"end",gid:G.id});
+function addMsg(m){const d=mk($("chat"),"div",m.who+": "+m.t);const p=G&&G.players.find(x=>x.name===me.name);d.className="m"+(p&&m.uid&&m.who===p.char?" me":"");$("chat").scrollTop=1e9}
+function msg(m){addMsg(m.m)}
+function history(m){$("chat").innerHTML="";m.msgs.forEach(addMsg)}
+function send(){const v=$("msg").value.trim();if(!v)return;$("msg").value="";tx({t:"say",gid:G.id,t2:v})}
+$("send").onclick=send;$("msg").onkeydown=e=>{if(e.key==="Enter")send()};
+
+function result(m){
+  screen("result");clearInterval(tId);const r=m.mine;
+  $("pct").textContent=r.pct==null?"–":r.pct.toFixed(1)+"%";$("verdict").firstChild.textContent=r.verdict;
+  const tc=$("topc");if(m.top){tc.classList.remove("hide");tc.textContent=`🥇 Top performer of this game: ${m.top.name} (ID ${m.top.id}) — ${m.top.pct.toFixed(1)}%`}else tc.classList.add("hide");
+  const fb=$("fb");fb.innerHTML="";
+  r.det.forEach(d=>{const x=mk(fb,"div");x.style.margin="8px 0";mk(x,"b",d[0]+": "+d[1]);if(d[2])mk(x,"div",d[2]).className="small"});
+  [["Strengths",r.strengths],["To improve",r.improve]].forEach(([h,l])=>{if(!l||!l.length)return;mk(fb,"b",h);const u=mk(fb,"ul");l.forEach(x=>mk(u,"li",x))});
+  if(r.note)mk(fb,"div","Note: "+r.note).className="small";
+  mk(fb,"p",r.extra).className="small";mk(fb,"p","This is an AI's opinion and can be imperfect.").className="small";
+}
+$("again").onclick=()=>{G=null;screen("home")};
+</script></body></html>
