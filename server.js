@@ -1,14 +1,18 @@
 // Karan Patel Role-Play (fan-made). One Node server: login, lobby, games, AI, scoring, leaderboard.
 import express from 'express';
 import { WebSocketServer } from 'ws';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import crypto from 'crypto';
 import http from 'http';
 import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
 import { fileURLToPath } from 'url';
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
+const MEDIA_DIR = process.env.MEDIA_DIR || path.join(__dir, 'fan-media');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const GKEY = process.env.GEMINI_API_KEY;
 const KEY = process.env.ANTHROPIC_API_KEY;
 const PROVIDER = process.env.AI_PROVIDER || (GKEY && !KEY ? 'gemini' : 'claude'); // 'gemini' (free tier) or 'claude'
@@ -18,6 +22,7 @@ const JUDGES = +process.env.JUDGES || (PROVIDER === 'gemini' ? 1 : 2);
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-5-5';
 const FAKE = PROVIDER === 'gemini' ? !GKEY : !KEY; // no key = fake AI for local testing only
 const TEST_SECONDS = +process.env.TEST_SECONDS || 0;
+fs.mkdirSync(MEDIA_DIR, { recursive: true });
 if (FAKE) console.warn('WARNING: no API key set for provider ' + PROVIDER + '. Using FAKE AI (testing only).');
 else console.log('AI provider:', PROVIDER);
 
@@ -28,11 +33,16 @@ const mclient = new MongoClient(MONGO_URI);
 await mclient.connect();
 const mdb = mclient.db(process.env.MONGODB_DB || 'karan_game');
 const Users = mdb.collection('users'), Sessions = mdb.collection('sessions'), Results = mdb.collection('results'), Counters = mdb.collection('counters');
+const FanChat = mdb.collection('fan_chat'), FanChatBlocks = mdb.collection('fan_chat_blocks'), AdminSessions = mdb.collection('admin_sessions');
 await Users.createIndex({ nameLower: 1 }, { unique: true });
 await Users.createIndex({ pub: 1 }, { unique: true });
 await Users.createIndex({ wins: -1 });
 await Sessions.createIndex({ token: 1 }, { unique: true });
 await Sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 });
+await FanChat.createIndex({ createdAt: -1 });
+await FanChat.createIndex({ uid: 1, createdAt: -1 });
+await FanChatBlocks.createIndex({ uid: 1 }, { unique: true });
+await AdminSessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 });
 console.log('MongoDB connected');
 const nextId = async () => (await Counters.findOneAndUpdate({ _id: 'users' }, { $inc: { n: 1 } }, { upsert: true, returnDocument: 'after' })).n;
 const hash = (pw, salt) => crypto.scryptSync(pw, salt, 64).toString('hex');
@@ -47,10 +57,10 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '10kb' }));
 // Home page with absolute photo URL so WhatsApp/Instagram/etc show the photo as a tappable preview card
-import fs from 'fs';
 const page = f => (req, res) => { const base = `${req.protocol}://${req.get('host')}`; res.type('html').send(fs.readFileSync(path.join(__dir, 'public', f), 'utf8').replaceAll('__BASE__', base)); };
 app.get(['/', '/index.html'], page('index.html'));
 app.get('/p', page('poster.html'));
+app.use('/uploads', express.static(MEDIA_DIR, { index: false, setHeaders: res => res.setHeader('X-Content-Type-Options', 'nosniff') }));
 app.use(express.static(path.join(__dir, 'public')));
 const setCookie = (req, res, t) => res.setHeader('Set-Cookie', `sid=${t}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${req.secure ? '; Secure' : ''}`);
 const pubUser = u => ({ name: u.name, id: u.pub, wins: u.wins });
@@ -78,6 +88,137 @@ app.post('/api/login', async (req, res) => {
 });
 app.post('/api/logout', async (req, res) => { try { await Sessions.deleteOne({ token: cookie(req, 'sid') || '' }); } catch (e) { console.error(e); } res.json({ ok: 1 }); });
 app.get('/api/me', async (req, res) => { try { const u = await userBySid(cookie(req, 'sid')); u ? res.json(pubUser(u)) : res.status(401).json({}); } catch (e) { res.status(500).json({}); } });
+
+// ---------- public fan chat ----------
+const mediaExtensions = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif', 'image/avif': '.avif', 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'video/ogg': '.ogv' };
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, MEDIA_DIR),
+    filename: (_req, file, cb) => cb(null, crypto.randomBytes(18).toString('hex') + mediaExtensions[file.mimetype]),
+  }),
+  fileFilter: (_req, file, cb) => Object.hasOwn(mediaExtensions, file.mimetype) ? cb(null, true) : cb(new Error('Attach an image or video file.')),
+});
+const removeUploadedFiles = files => Promise.all(files.map(file => fs.promises.rm(file.path, { force: true })));
+const uploadFanMedia = (req, res, next) => upload.array('media', 5)(req, res, async error => {
+  if (error) {
+    try { await removeUploadedFiles(req.files || []); }
+    catch (cleanupError) { console.error(cleanupError); return res.status(500).json({ error: 'Could not clean up the uploaded files.' }); }
+    return res.status(400).json({ error: error.message });
+  }
+  next();
+});
+const signedIn = async (req, res, next) => {
+  try {
+    const user = await userBySid(cookie(req, 'sid') || '');
+    if (!user) return res.status(401).json({ error: 'Log in to use the fan chat.' });
+    if (await FanChatBlocks.findOne({ uid: user._id })) return res.status(403).json({ error: 'Your fan chat access is blocked.' });
+    req.user = user;
+    next();
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not verify your fan chat access.' }); }
+};
+app.get('/api/fan-chat', async (_req, res) => {
+  try {
+    const posts = await FanChat.find({}).sort({ createdAt: -1, _id: -1 }).limit(100).toArray();
+    const userIds = [...new Set(posts.map(post => post.uid))];
+    const users = await Users.find({ _id: { $in: userIds } }).project({ name: 1 }).toArray();
+    const names = new Map(users.map(user => [user._id, user.name]));
+    const messages = posts.reverse().filter(post => names.has(post.uid)).map(post => ({
+      id: post._id.toString(), uid: post.uid, name: names.get(post.uid), body: post.body, created_at: post.createdAt.getTime(),
+      media: (post.media || []).map(file => ({ id: file.id, url: '/uploads/' + file.filename, name: file.name, mime: file.mime })),
+    }));
+    const [{ members = 0 } = {}] = await FanChat.aggregate([{ $group: { _id: '$uid' } }, { $count: 'members' }]).toArray();
+    res.json({ messages, members });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load the fan chat.' }); }
+});
+app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
+  const body = String(req.body?.body || '').trim().slice(0, 4000);
+  const files = req.files || [];
+  const discardFiles = async () => {
+    try { await removeUploadedFiles(files); }
+    catch (error) { console.error(error); }
+  };
+  if (!body && !files.length) { await discardFiles(); return res.status(400).json({ error: 'Write a message or attach media.' }); }
+  try {
+    const last = await FanChat.findOne({ uid: req.user._id }, { sort: { createdAt: -1 } });
+    if (last && Date.now() - last.createdAt.getTime() < 1000) {
+      await discardFiles();
+      return res.status(429).json({ error: 'Please wait a moment before posting again.' });
+    }
+    await FanChat.insertOne({
+      uid: req.user._id, body, createdAt: new Date(),
+      media: files.map(file => ({ id: crypto.randomBytes(12).toString('hex'), filename: file.filename, name: path.basename(file.originalname).slice(0, 180), mime: file.mimetype })),
+    });
+    res.status(201).json({ ok: true });
+  } catch (error) { await discardFiles(); console.error(error); res.status(500).json({ error: 'Message could not be sent.' }); }
+});
+
+// ---------- moderator tools ----------
+const adminCookie = req => cookie(req, 'adminsid') || '';
+const setAdminCookie = (req, res, token) => res.setHeader('Set-Cookie', `adminsid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400${req.secure ? '; Secure' : ''}`);
+const clearAdminCookie = req => `adminsid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${req.secure ? '; Secure' : ''}`;
+const validAdminSession = async req => ADMIN_PASSWORD && AdminSessions.findOne({ _id: adminCookie(req), createdAt: { $gt: new Date(Date.now() - 86400000) } });
+const requireAdmin = async (req, res, next) => {
+  try {
+    if (!await validAdminSession(req)) return res.status(403).json({ error: 'Moderator sign-in required.' });
+    next();
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not verify moderator access.' }); }
+};
+app.get('/api/admin/session', async (req, res) => {
+  try { res.json({ configured: Boolean(ADMIN_PASSWORD), authenticated: Boolean(await validAdminSession(req)) }); }
+  catch (error) { console.error(error); res.status(500).json({ error: 'Could not load moderator status.' }); }
+});
+app.post('/api/admin/login', async (req, res) => {
+  if (!ADMIN_PASSWORD) return res.status(503).json({ error: 'Set ADMIN_PASSWORD in the server environment first.' });
+  const supplied = crypto.createHash('sha256').update(String(req.body?.password || '')).digest();
+  const expected = crypto.createHash('sha256').update(ADMIN_PASSWORD).digest();
+  if (!crypto.timingSafeEqual(supplied, expected)) return res.status(401).json({ error: 'Incorrect moderator password.' });
+  try {
+    const token = crypto.randomBytes(32).toString('hex');
+    await AdminSessions.insertOne({ _id: token, createdAt: new Date() });
+    setAdminCookie(req, res, token);
+    res.json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not sign in as moderator.' }); }
+});
+app.post('/api/admin/logout', async (req, res) => {
+  try {
+    await AdminSessions.deleteOne({ _id: adminCookie(req) });
+    res.setHeader('Set-Cookie', clearAdminCookie(req));
+    res.json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not sign out moderator.' }); }
+});
+app.get('/api/admin/blocks', requireAdmin, async (_req, res) => {
+  try {
+    const blocks = await FanChatBlocks.find({}).toArray();
+    const users = await Users.find({ _id: { $in: blocks.map(block => block.uid) } }).project({ name: 1 }).sort({ name: 1 }).toArray();
+    res.json({ users: users.map(user => ({ id: user._id, name: user.name })) });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load blocked members.' }); }
+});
+app.delete('/api/admin/messages/:id', requireAdmin, async (req, res) => {
+  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
+  try {
+    const id = new ObjectId(req.params.id);
+    const post = await FanChat.findOne({ _id: id });
+    if (!post) return res.status(404).json({ error: 'Message not found.' });
+    await FanChat.deleteOne({ _id: id });
+    await Promise.all((post.media || []).map(file => fs.promises.rm(path.join(MEDIA_DIR, file.filename), { force: true })));
+    res.json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete this message.' }); }
+});
+app.post('/api/admin/blocks/:uid', requireAdmin, async (req, res) => {
+  const uid = Number(req.params.uid);
+  if (!Number.isSafeInteger(uid) || uid <= 0) return res.status(400).json({ error: 'Invalid member ID.' });
+  try {
+    if (!await Users.findOne({ _id: uid })) return res.status(404).json({ error: 'User not found.' });
+    await FanChatBlocks.updateOne({ uid }, { $setOnInsert: { uid, blockedAt: new Date() } }, { upsert: true });
+    res.json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not block this member.' }); }
+});
+app.delete('/api/admin/blocks/:uid', requireAdmin, async (req, res) => {
+  const uid = Number(req.params.uid);
+  if (!Number.isSafeInteger(uid) || uid <= 0) return res.status(400).json({ error: 'Invalid member ID.' });
+  try { await FanChatBlocks.deleteOne({ uid }); res.json({ ok: true }); }
+  catch (error) { console.error(error); res.status(500).json({ error: 'Could not unblock this member.' }); }
+});
 
 // ---------- AI ----------
 const sleep = ms => new Promise(r => setTimeout(r, ms));
