@@ -33,6 +33,15 @@ textarea{min-height:88px;resize:vertical}
 dialog{width:min(440px,calc(100% - 28px));padding:0;border:1px solid var(--line);border-radius:7px;color:var(--ink);box-shadow:0 20px 70px #102a2b40}dialog::backdrop{background:#102a2b88}.dialog-inner{padding:22px}.dialog-inner input{margin:10px 0}.blocked-user{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
 @keyframes arrive{from{opacity:.6;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:780px){main{padding:15px}.community-layout{grid-template-columns:1fr}.fan-intro{padding:20px}.fan-intro:after{right:5%;font-size:115px}.side-stack{grid-template-columns:repeat(2,minmax(0,1fr))}.side-stack .game-card{grid-column:1/-1}}
+.ai-warning{margin:0 0 20px;padding:18px 22px;border:2px solid #b94230;border-left-width:10px;border-radius:14px;background:linear-gradient(110deg,#fff0e8,#fff8e6);color:#5d241d;box-shadow:0 8px 24px #9f36221c}
+.ai-warning strong{display:block;margin-bottom:4px;color:#a12f23;font-size:clamp(1.15rem,2.4vw,1.65rem);line-height:1.2}
+.ai-warning p{margin:0;font-size:clamp(.98rem,1.5vw,1.15rem);font-weight:600;line-height:1.45}
+.dialog-inner{max-height:min(85dvh,800px);overflow-y:auto}
+.dialog-inner #blockedList,.dialog-inner #memberList{max-height:220px;overflow:auto}
+.member-list{margin:10px 0 18px}
+.member-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
+.member-row span{overflow-wrap:anywhere}
+.moderation-error{min-height:20px;color:#a83327}
 @media(max-width:520px){main{padding:11px}.masthead{align-items:flex-start}.account{gap:7px;flex-direction:column;align-items:flex-end}.account .btn{padding:7px 10px}.fan-intro{align-items:flex-start;flex-direction:column}.fan-intro h1{font-size:1.7rem}.room-count{text-align:left}.chat-head{padding:13px}.chat-compose{padding:11px}.compose-row{align-items:stretch;flex-direction:column}.compose-actions{justify-content:space-between}.attach-btn{flex:1}.side-stack{grid-template-columns:1fr}.side-stack .game-card{grid-column:auto}.auth-brand h1{font-size:1.4rem}}
 body{background:radial-gradient(ellipse at top left,#fff4df 0,transparent 36%),radial-gradient(ellipse at top right,#dceef2 0,transparent 32%),var(--paper)}
 .card{border-radius:16px;box-shadow:0 8px 24px #17383b0b;padding:20px}
@@ -69,6 +78,7 @@ input,select,textarea{min-width:0;border-radius:10px}
 
 <div id="auth">
   <div class="auth-brand"><a id="logoLink" title="Click to register" style="text-decoration:none"><span class="brand-mark">KP</span></a><div><h1>Karan Patel Fan Club</h1><div class="small">Role-play · community · fans chat</div></div></div>
+  <aside class="ai-warning" role="note" aria-label="Important AI accuracy warning"><strong>IMPORTANT: AI ROLE-PLAY AND QUIZ ANSWERS CAN BE WRONG</strong><p>AI may portray characters inaccurately, misunderstand the scene, or give incorrect facts and answers. This is fan-made entertainment, not an official source. Please verify important information.</p></aside>
   <div class="card" id="regCard">
     <h2 id="authTitle">Login</h2>
     <p class="small">Sign in to play together, share posts and reels, and join the public Karan Patel fans chat.</p>
@@ -82,6 +92,7 @@ input,select,textarea{min-width:0;border-radius:10px}
 
 <div id="home" class="hide">
   <header class="masthead"><div class="brand-lockup"><span class="brand-mark">KP</span><div><strong>Karan Patel Fan Club</strong><span class="small">A fan-made community</span></div></div><div class="account"><span><span class="account-name" id="me"></span> <span class="small" id="myid"></span></span><button class="btn alt" id="logout">Log out</button></div></header>
+  <aside class="ai-warning" role="note" aria-label="Important AI accuracy warning"><strong>IMPORTANT: AI ROLE-PLAY AND QUIZ ANSWERS CAN BE WRONG</strong><p>AI may portray characters inaccurately, misunderstand the scene, or give incorrect facts and answers. This is fan-made entertainment, not an official source. Please verify important information.</p></aside>
   <section class="fan-intro"><div><p class="eyebrow">Fans, stories &amp; everything Karan</p><h1>Welcome to the fan room.</h1><p>Share a moment, a memory, or the latest reel.</p></div><div class="room-count"><span class="live-dot"></span><span id="fanCount">Community chat</span></div></section>
   <div class="community-layout">
     <section class="card" id="fanRoom" aria-label="Public fans chat">
@@ -93,12 +104,12 @@ input,select,textarea{min-width:0;border-radius:10px}
       <section class="card mode-card"><div class="section-title"><h2>Play together</h2><span class="tag">Role-play</span></div><div class="opts" id="modes"></div></section>
       <section class="card show-card" id="showBox"><h2>Choose a show</h2><div class="opts" id="shows"></div><input id="showCustom" placeholder="Or type another show / project"></section>
       <section class="card game-card"><div id="roleBox"><h2 id="charH">Character you will play</h2><input id="char" placeholder="Enter the character you want to play"><p class="small">Your account name is shown separately; type the show character you want to portray.</p></div><h2>Language</h2><input id="lang" value="Hinglish" placeholder="Hindi, Hinglish, English..."><div id="lengthBox"><h2>Role-play length</h2><select id="mins"><option>2</option><option selected>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select></div><div id="questionCountBox" class="hide"><h2>Number of quiz questions</h2><select id="questionCount"><option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select><p class="small">Every question has four options. No game timer.</p></div><p class="row" style="margin-top:12px"><button class="btn" id="solo">Play solo</button><button class="btn alt" id="host">Host a game</button></p><div class="small" id="err" style="color:#a83327"></div></section>
-      <section class="card"><h2>Join a game</h2><div class="row"><input id="code" placeholder="Game ID"><button class="btn alt" id="joinc">Join</button></div><h2 style="margin-top:18px">Open games</h2><div id="open" class="small">None right now.</div></section>
+      <section class="card"><h2>Join a game</h2><div class="row"><input id="code" placeholder="Game ID"><button class="btn alt" id="joinc">Join</button></div><div class="small" id="joinStatus" role="status"></div><h2 style="margin-top:18px">Open games</h2><div id="open" class="small">None right now.</div></section>
       <section class="card leader-card"><h2>Top players</h2><div id="board" class="small">No wins yet.</div></section>
       <section class="card warn"><b>Fan-made game.</b> Not affiliated with or endorsed by Karan Patel or his team. AI replies and scores may be inaccurate and do not represent any real person's words or opinions.</section>
     </aside>
   </div>
-  <dialog id="modDialog"><div class="dialog-inner"><div class="section-title"><h2>Moderator access</h2><button class="text-btn" id="modClose" type="button" aria-label="Close">Close</button></div><form id="modForm"><label class="small" for="modPassword">Moderator password</label><input id="modPassword" type="password" autocomplete="current-password" required><button class="btn" id="modSubmit" type="submit">Sign in</button><div class="chat-status" id="modStatus" role="status"></div></form><div id="modTools" class="hide"><div class="section-title" style="margin-top:20px"><h3>Blocked members</h3><button class="text-btn" id="modLogout" type="button">Sign out</button></div><div id="blockedList"></div></div></div></dialog>
+  <dialog id="modDialog"><div class="dialog-inner"><div class="section-title"><h2>Moderator access</h2><button class="text-btn" id="modClose" type="button" aria-label="Close">Close</button></div><form id="modForm"><label class="small" for="modPassword">Moderator password</label><input id="modPassword" type="password" autocomplete="current-password" required><button class="btn" id="modSubmit" type="submit">Sign in</button><div class="chat-status" id="modStatus" role="status"></div></form><div id="modTools" class="hide"><div class="section-title" style="margin-top:20px"><h3>Manage fan chat access</h3><button class="text-btn" id="modLogout" type="button">Sign out</button></div><label class="small" for="memberSearch">Find members to block or unblock</label><input id="memberSearch" type="search" maxlength="20" placeholder="Search by the start of a username"><div class="small">Showing up to 50 members. Search by username to find someone specific.</div><div id="memberList" class="member-list" aria-live="polite"></div><h3>Blocked users</h3><div class="small">Unblock a user here, or use the member list above to change access.</div><div id="blockedList"></div></div></div></dialog>
 </div>
 
 <div id="lobby" class="hide">
@@ -112,7 +123,7 @@ input,select,textarea{min-width:0;border-radius:10px}
 <div id="play" class="hide">
   <div class="bar"><div><b id="title"></b><div class="small" id="sub"></div></div><div id="timer">00:00</div></div>
   <section id="roleplayArea"><div id="chat"></div><div class="row"><input id="msg" maxlength="500" placeholder="Type your dialogue... use (brackets) for actions"><button class="btn" id="send">Send</button></div><div class="small">Role-play is text-only; images and videos cannot be sent here.</div></section>
-  <section id="quizArea" class="quiz-panel hide"><div class="quiz-progress"><span id="quizCategory"></span><span id="quizProgress"></span></div><h2 class="quiz-question" id="quizQuestion"></h2><div class="quiz-options" id="quizOptions"></div><div class="quiz-status" id="quizStatus" role="status"></div><div id="quizScores" class="quiz-scoreboard"></div><button class="btn hide" id="quizNext" type="button"></button></section>
+  <section id="quizArea" class="quiz-panel hide"><div class="quiz-progress"><span id="quizCategory"></span><span id="quizProgress"></span><span id="quizCountdown"></span></div><h2 class="quiz-question" id="quizQuestion"></h2><div class="quiz-options" id="quizOptions"></div><div class="quiz-status" id="quizStatus" role="status"></div><div id="quizScores" class="quiz-scoreboard"></div><button class="btn hide" id="quizNext" type="button"></button></section>
   <p><button class="btn alt hide" id="end">End game now (host)</button></p>
 </div>
 
@@ -128,7 +139,7 @@ const $=id=>document.getElementById(id);
 const mk=(p,tag,t)=>{const e=document.createElement(tag);if(t!=null)e.textContent=t;p.appendChild(e);return e};
 const MODES={serial:"Serial Role-Play",quiz:"Karan Patel Quiz"};
 const SHOWS=["Yeh Hai Mohabbatein","Kasautii Zindagii Kay","Kuch Toh Log Kahenge","Qayamat Ki Raat","Ek Hasina Thi","Ishq Mein Marjawan"];
-let ws,me=null,mode="serial",show="",G=null,tId=null,off=0,regMode=false,shown="",fanPoll=null,isModerator=false;
+let ws,me=null,mode="serial",show="",G=null,tId=null,off=0,regMode=false,shown="",fanPoll=null,isModerator=false,joinPending=false;
 const screen=n=>["auth","home","lobby","play","result"].forEach(s=>$(s).classList.toggle("hide",s!==n));
 
 // ---- auth ----
@@ -194,16 +205,59 @@ async function loadFanChat(force=false){
   }catch{$("fanStatus").textContent="Couldn't load the chat. Retrying..."}
 }
 async function refreshModerator(){
-  try{const response=await fetch("/api/admin/session"),state=await response.json(),changed=isModerator!==state.authenticated;isModerator=state.authenticated;$("adminOpen").classList.toggle("hide",!state.configured);$("modForm").classList.toggle("hide",isModerator);$("modTools").classList.toggle("hide",!isModerator);if(changed)loadFanChat(true);if(isModerator)loadBlocked()}catch{}
+  try{
+    const response=await fetch("/api/admin/session"),state=await response.json(),changed=isModerator!==state.authenticated;
+    if(!response.ok)throw new Error(state.error||"Could not load moderator status.");
+    isModerator=state.authenticated;$("adminOpen").classList.toggle("hide",!state.configured);$("modForm").classList.toggle("hide",isModerator);$("modTools").classList.toggle("hide",!isModerator);
+    if(changed)loadFanChat(true);
+    if(isModerator)await loadModeratorLists();
+  }catch(error){$("modStatus").textContent=error.message||"Could not load moderator status."}
 }
 async function loadBlocked(){
-  try{const response=await fetch("/api/admin/blocks"),data=await response.json(),list=$("blockedList");list.replaceChildren();if(!response.ok)return;
-    data.users.forEach(user=>{const row=document.createElement("div");row.className="blocked-user";const name=document.createElement("span");name.textContent=user.name;const button=document.createElement("button");button.className="mini-action";button.textContent="Unblock";button.onclick=()=>moderate(`/api/admin/blocks/${user.id}`,"DELETE",`Unblock ${user.name}?`);row.append(name,button);list.append(row)});
-    if(!data.users.length)list.textContent="No blocked members.";
-  }catch{}
+  const list=$("blockedList");
+  try{
+    const response=await fetch("/api/admin/blocks"),data=await response.json();list.replaceChildren();
+    if(!response.ok)throw new Error(data.error||"Could not load blocked users.");
+    data.users.forEach(user=>{
+      const row=document.createElement("div");row.className="blocked-user";
+      const name=document.createElement("span");name.textContent=`${user.name} (ID ${user.pub})`;
+      const button=document.createElement("button");button.className="mini-action";button.textContent="Unblock";
+      button.onclick=()=>moderate(`/api/admin/blocks/${user.id}`,"DELETE",`Unblock ${user.name} from fan chat?`);
+      row.append(name,button);list.append(row);
+    });
+    if(!data.users.length)list.textContent="No blocked users.";
+  }catch(error){list.textContent=error.message||"Could not load blocked users."}
+}
+async function loadModeratorMembers(){
+  const list=$("memberList"),search=$("memberSearch").value.trim();
+  try{
+    const response=await fetch(`/api/admin/members?search=${encodeURIComponent(search)}`),data=await response.json();list.replaceChildren();
+    if(!response.ok)throw new Error(data.error||"Could not load members.");
+    data.users.forEach(user=>{
+      const row=document.createElement("div");row.className="member-row";
+      const label=document.createElement("span");label.textContent=`${user.name} (ID ${user.pub})`;
+      const button=document.createElement("button");button.className="mini-action";button.textContent=user.blocked?"Unblock":"Block";
+      button.setAttribute("aria-label",`${user.blocked?"Unblock":"Block"} ${user.name}`);
+      button.onclick=()=>moderate(`/api/admin/blocks/${user.id}`,user.blocked?"DELETE":"POST",user.blocked?`Unblock ${user.name} from fan chat?`:`Block ${user.name} from fan chat?`);
+      row.append(label,button);list.append(row);
+    });
+    if(!data.users.length)list.textContent=search?"No members found.":"No registered members.";
+  }catch(error){list.textContent=error.message||"Could not load members."}
+}
+async function loadModeratorLists(){await Promise.all([loadBlocked(),loadModeratorMembers()])}
+let memberSearchTimer;
+$("memberSearch").oninput=()=>{
+  clearTimeout(memberSearchTimer);
+  memberSearchTimer=setTimeout(loadModeratorMembers,200);
 }
 async function moderate(url,method,question){
-  if(!confirm(question))return;const response=await fetch(url,{method});if(!response.ok){const data=await response.json();$("modStatus").textContent=data.error||"Moderation action failed.";return}await loadFanChat(true);await loadBlocked();
+  if(!confirm(question))return;
+  try{
+    const response=await fetch(url,{method}),data=await response.json();
+    if(!response.ok)throw new Error(data.error||"Moderation action failed.");
+    $("modStatus").textContent="";
+    await loadFanChat(true);await loadModeratorLists();
+  }catch(error){$("modStatus").textContent=error.message||"Moderation action failed."}
 }
 async function deleteOwnPost(id){
   if(!confirm("Delete your message and its attached media? Others will only see an anonymous removal notice."))return;
@@ -252,35 +306,42 @@ chips($("modes"),Object.entries(MODES),k=>{mode=k;$("showBox").classList.toggle(
 chips($("shows"),SHOWS.map(s=>[s,s]),k=>{show=k;$("showCustom").value=""});
 $("showCustom").oninput=()=>{show=$("showCustom").value;[...$("shows").children].forEach(c=>c.classList.remove("on"))};
 const form=()=>({mode,show:(show||$("showCustom").value).trim(),char:$("char").value.trim(),lang:$("lang").value,mins:+$("mins").value,questionCount:+$("questionCount").value});
-const tx=o=>ws&&ws.readyState===1?ws.send(JSON.stringify(o)):($("err").textContent="Connecting... try again.");
+const tx=o=>ws&&ws.readyState===1?ws.send(JSON.stringify(o)):(joinPending?$("joinStatus").textContent="Connecting… try again.":$("err").textContent="Connecting... try again.");
 $("solo").onclick=()=>tx({t:"host",solo:true,...form()});
 $("host").onclick=()=>tx({t:"host",...form()});
-$("joinc").onclick=()=>tx({t:"join",gid:$("code").value.trim().toUpperCase(),char:$("char").value.trim()});
+function joinGame(gid,direct){
+  joinPending=true;$("joinStatus").textContent=direct?"Joining game…":"Sending request…";
+  tx({t:"join",gid,char:$("char").value.trim(),direct});
+}
+$("joinc").onclick=()=>joinGame($("code").value.trim().toUpperCase(),true);
 
 // ---- websocket ----
 function connect(){
   ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
   ws.onclose=e=>{if(e.code===4001){location.reload();return}setTimeout(()=>me&&connect(),1500)};
-  ws.onmessage=e=>{const m=JSON.parse(e.data);({lobby,game,msg,history,result,err,kicked,joinRequest,requestSent})[m.t]?.(m)};
+  ws.onmessage=e=>{const m=JSON.parse(e.data);({lobby,game,msg,history,result,err,kicked,joinRequest,playerJoined,requestSent,joinedGame})[m.t]?.(m)};
 }
 function lobby(m){
   const o=$("open");o.innerHTML="";if(!m.list.length)o.textContent="None right now.";
-  m.list.forEach(g=>{const r=mk(o,"div");r.className="row";const details=g.mode==="quiz"?`${g.questionCount} questions`:`${g.mins} min`;mk(r,"span",`${g.host} is starting "${g.title}" (${details}, ${g.n} in) · ID ${g.id}`).style.flex="1";const b=mk(r,"button","Request to join");b.className="btn alt";b.onclick=()=>tx({t:"join",gid:g.id,char:$("char").value.trim()})});
+  m.list.forEach(g=>{const r=mk(o,"div");r.className="row";const details=g.mode==="quiz"?`${g.questionCount} questions`:`${g.mins} min`;mk(r,"span",`${g.host} is starting "${g.title}" (${details}, ${g.n} in) · ID ${g.id}`).style.flex="1";const b=mk(r,"button","Request to join");b.className="btn alt";b.onclick=()=>joinGame(g.id,false)});
   const bd=$("board");bd.innerHTML="";if(!m.board.length)bd.textContent="No wins yet.";m.board.forEach((u,i)=>mk(bd,"div",`${i+1}. ${u.name} (ID ${u.pub}) — ${u.wins} wins`));
 }
 function err(m){
   if(!$("play").classList.contains("hide")&&G?.mode==="quiz")$("quizStatus").textContent=m.e;
   else if(!$("lobby").classList.contains("hide"))$("lmsg").textContent=m.e;
-  else{$("err").textContent=m.e;if(!$("home").classList.contains("hide"))window.scrollTo(0,0)}
+  else if(joinPending){$("joinStatus").textContent=m.e;joinPending=false}
+  else $("err").textContent=m.e;
 }
 function kicked(){G=null;screen("home");$("err").textContent="The host did not accept your request, or the game was cancelled."}
 function joinRequest(m){if(G&&G.id===m.gid&&G.host===me.id){$("lmsg").textContent=`New join request: ${m.name} (ID ${m.pub}) wants to play ${m.char}. Accept or reject it below.`;screen("lobby");drawLobby(true)}}
-function requestSent(m){$("err").textContent=`Join request sent to ${m.host}. Waiting for approval.`}
+function playerJoined(m){if(G&&G.id===m.gid&&G.host===me.id){$("lmsg").textContent=`${m.name} (ID ${m.pub}) joined the game.`;screen("lobby");drawLobby(true)}}
+function requestSent(m){joinPending=false;$("joinStatus").textContent=`Request sent to ${m.host}. Waiting for approval.`}
+function joinedGame(m){joinPending=false;$("joinStatus").textContent=`Joined ${m.host}'s game.`}
 function game(m){
   G=m.g;off=G.now-Date.now();
   const isHost=me&&G.host===me.id;
   if(G.status==="lobby"){screen("lobby");drawLobby(isHost)}
-  else if(G.status==="live"){screen("play");$("title").textContent=G.title+(G.solo?"":" · multiplayer");const p=G.players.find(x=>x.pub===me.id);$("sub").textContent=`You are: ${p?p.char:""} · ${p?.name||me.name} (ID ${p?.pub||me.id})`;const quiz=G.mode==="quiz";$("roleplayArea").classList.toggle("hide",quiz);$("quizArea").classList.toggle("hide",!quiz);$("timer").classList.toggle("hide",quiz);$("end").classList.toggle("hide",!isHost);clearInterval(tId);if(quiz)drawQuiz(isHost);else{if(shown!==G.id){shown=G.id;$("chat").innerHTML=""}tick();tId=setInterval(tick,500)}}
+  else if(G.status==="live"){screen("play");$("title").textContent=G.title+(G.solo?"":" · multiplayer");const p=G.players.find(x=>x.pub===me.id);$("sub").textContent=`You are: ${p?p.char:""} · ${p?.name||me.name} (ID ${p?.pub||me.id})`;const quiz=G.mode==="quiz";$("roleplayArea").classList.toggle("hide",quiz);$("quizArea").classList.toggle("hide",!quiz);$("timer").classList.toggle("hide",quiz);$("end").classList.toggle("hide",!isHost);clearInterval(tId);if(quiz){drawQuiz(isHost);tId=setInterval(tickQuiz,500)}else{if(shown!==G.id){shown=G.id;$("chat").innerHTML=""}tick();tId=setInterval(tick,500)}}
   else if(G.status==="scoring"){clearInterval(tId);$("timer").textContent="Scoring…";screen("result");$("pct").textContent="…";$("verdict").firstChild.textContent="Judging your performance carefully...";$("fb").innerHTML="";$("topc").classList.add("hide")}
 }
 const fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
@@ -292,7 +353,7 @@ function drawLobby(isHost){
     else if(isHost){const r=mk(rq,"div");r.className="row";mk(r,"span",`${p.name} (ID ${p.pub}) wants to join${G.mode==="serial"?" as "+p.char:""}`).style.flex="1";const a=mk(r,"button","Accept");a.className="btn";a.onclick=()=>tx({t:"accept",gid:G.id,uid:p.uid});const x=mk(r,"button","Reject");x.className="btn alt";x.onclick=()=>tx({t:"reject",gid:G.id,uid:p.uid})}});
   $("reqs").classList.toggle("hide",!rq.children.length);$("go").classList.toggle("hide",!isHost);
   const mine=G.players.find(p=>p.pub===me.id);
-  $("lmsg").textContent=isHost?"Share the Game ID. Only you can start the game.":mine&&mine.status==="requested"?"Waiting for the host to accept...":"You are in. Waiting for the host to start.";
+  $("lmsg").textContent=isHost?(rq.children.length?`${rq.children.length} join request${rq.children.length===1?"":"s"} waiting. Accept or reject below.`:"Share the Game ID. Only you can start the game."):mine&&mine.status==="requested"?"Waiting for the host to accept...":"You are in. Waiting for the host to start.";
 }
 function drawQuiz(isHost){
   const quiz=G.quiz;if(!quiz?.question)return;
@@ -312,7 +373,15 @@ function drawQuiz(isHost){
   [...quiz.scores].sort((a,b)=>b.correct-a.correct||a.name.localeCompare(b.name)).forEach((player,index)=>{
     const row=mk(scores,"div");row.className="quiz-score-row";mk(row,"span",`${index+1}. ${player.name} (ID ${player.pub})`);mk(row,"b",`${player.correct}/${quiz.total}`);
   });
-  const next=$("quizNext");next.classList.toggle("hide",!isHost);next.textContent=quiz.revealed?(quiz.number===quiz.total?"Finish quiz":"Next question"):"Reveal answer";next.onclick=()=>tx({t:"quizNext",gid:G.id});
+  const next=$("quizNext");next.classList.toggle("hide",!isHost||quiz.revealed);next.textContent="Reveal answer";next.onclick=()=>tx({t:"quizNext",gid:G.id});
+  tickQuiz();
+}
+function tickQuiz(){
+  if(!G?.quiz)return;
+  const quiz=G.quiz,until=quiz.revealed?quiz.advanceAt:quiz.questionEndsAt;
+  if(!until){$("quizCountdown").textContent="";return}
+  const seconds=Math.max(0,Math.ceil((until-Date.now())/1000));
+  $("quizCountdown").textContent=`Next question in ${seconds}s`;
 }
 $("go").onclick=()=>tx({t:"start",gid:G.id});$("leave").onclick=()=>{tx({t:"leave",gid:G.id});G=null;screen("home")};$("end").onclick=()=>confirm("End the game for everyone and get scores?")&&tx({t:"end",gid:G.id});
 function addMsg(m){const d=mk($("chat"),"div",m.who+": "+m.t);const p=G&&G.players.find(x=>x.name===me.name);d.className="m"+(p&&m.uid&&m.who===p.char?" me":"");$("chat").scrollTop=1e9}

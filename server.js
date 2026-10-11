@@ -234,9 +234,18 @@ app.post('/api/admin/logout', async (req, res) => {
 app.get('/api/admin/blocks', requireAdmin, async (_req, res) => {
   try {
     const blocks = await FanChatBlocks.find({}).toArray();
-    const users = await Users.find({ _id: { $in: blocks.map(block => block.uid) } }).project({ name: 1 }).sort({ name: 1 }).toArray();
-    res.json({ users: users.map(user => ({ id: user._id, name: user.name })) });
+    const users = await Users.find({ _id: { $in: blocks.map(block => block.uid) } }).project({ name: 1, pub: 1 }).sort({ name: 1 }).toArray();
+    res.json({ users: users.map(user => ({ id: user._id, name: user.name, pub: user.pub })) });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load blocked members.' }); }
+});
+app.get('/api/admin/members', requireAdmin, async (req, res) => {
+  const search = String(req.query.search || '').trim().toLowerCase().slice(0, 20);
+  try {
+    const filter = search ? { nameLower: { $regex: `^${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}` } } : {};
+    const users = await Users.find(filter).sort({ nameLower: 1 }).limit(50).project({ name: 1, nameLower: 1, pub: 1 }).toArray();
+    const blocked = new Set((await FanChatBlocks.find({ uid: { $in: users.map(user => user._id) } }).toArray()).map(block => block.uid));
+    res.json({ users: users.map(user => ({ id: user._id, name: user.name, pub: user.pub, blocked: blocked.has(user._id) })) });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load members for moderation.' }); }
 });
 app.delete('/api/admin/messages/:id', requireAdmin, async (req, res) => {
   if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
@@ -333,6 +342,8 @@ function gamePayload(g, viewerUid) {
       submitted: g.quiz.currentAnswers.size,
       myChoice: g.quiz.currentAnswers.get(viewerUid) ?? null,
       revealed: g.quiz.revealed,
+      questionEndsAt: g.quiz.questionEndsAt || null,
+      advanceAt: g.quiz.advanceAt || null,
       scores: joined(g).map(([uid, player]) => ({
         name: player.name,
         pub: player.pub,
@@ -407,7 +418,7 @@ async function judge(g, uid, p) {
 }
 async function endGame(g) {
   if (g.status !== 'live') return;
-  g.status = 'scoring'; clearTimeout(g.timer); pushState(g);
+  g.status = 'scoring'; clearTimeout(g.timer); clearTimeout(g.quiz?.questionTimer); clearTimeout(g.quiz?.advanceTimer); pushState(g);
   const ps = joined(g);
   const res = await Promise.all(ps.map(async ([uid, p]) => { try { return [uid, p, await judge(g, uid, p)]; } catch (e) { return [uid, p, { pct: null, verdict: 'Could not score', det: [], strengths: [], improve: [], note: '', extra: 'The AI judge had a problem. Please try again later.' }]; } }));
   let top = null;
@@ -474,10 +485,17 @@ wss.on('connection', (ws, req) => {
         const char = g.mode === 'quiz' ? me.name : clamp(m.char, 40);
         if (g.mode === 'serial' && !char) return err('Choose the character you want to play before requesting to join.');
         if (g.mode === 'serial' && [...g.players.values()].some(p => p.char.toLowerCase() === char.toLowerCase())) return err('That character is already taken. Choose another.');
-        g.players.set(uid, { name: me.name, pub: me.pub, char, status: 'requested' });
+        const direct = m.direct === true;
+        g.players.set(uid, { name: me.name, pub: me.pub, char, status: direct ? 'joined' : 'requested' });
         pushState(g);
-        sendUser(g.host, { t: 'joinRequest', gid: g.id, name: me.name, pub: me.pub, char });
-        send(ws, { t: 'requestSent', gid: g.id, host: g.players.get(g.host).name });
+        if (direct) {
+          sendUser(g.host, { t: 'playerJoined', gid: g.id, name: me.name, pub: me.pub, char });
+          send(ws, { t: 'joinedGame', gid: g.id, host: g.players.get(g.host).name });
+          pushLobby();
+        } else {
+          sendUser(g.host, { t: 'joinRequest', gid: g.id, name: me.name, pub: me.pub, char });
+          send(ws, { t: 'requestSent', gid: g.id, host: g.players.get(g.host).name });
+        }
       } else if (m.t === 'accept' || m.t === 'reject') {
         const g = games.get(m.gid); if (!g || g.host !== uid || g.status !== 'lobby') return;
         const p = g.players.get(+m.uid); if (!p || p.status !== 'requested') return;
@@ -487,18 +505,13 @@ wss.on('connection', (ws, req) => {
         const g = games.get(m.gid);
         if (!g || g.mode !== 'quiz' || g.status !== 'live' || !g.quiz || !g.players.has(uid)) return err('That quiz is not accepting answers.');
         if (!submitQuizAnswer(g.quiz, uid, Number(m.choice))) return err('Your answer was already submitted, or that option is not valid.');
-        if (g.quiz.currentAnswers.size === joined(g).length) revealQuizQuestion(g.quiz, joined(g));
+        if (g.quiz.currentAnswers.size === joined(g).length) revealAndScheduleQuizAdvance(g);
         pushState(g);
       } else if (m.t === 'quizNext') {
         const g = games.get(m.gid);
         if (!g || g.mode !== 'quiz' || g.status !== 'live' || g.host !== uid || !g.quiz) return err('Only the quiz host can control the next question.');
-        if (!g.quiz.revealed) revealQuizQuestion(g.quiz, joined(g));
-        else if (g.quiz.index + 1 >= g.quiz.questions.length) { await endGame(g); return; }
-        else {
-          g.quiz.index += 1;
-          g.quiz.currentAnswers.clear();
-          g.quiz.revealed = false;
-        }
+        if (g.quiz.revealed) return err('The next question will appear automatically.');
+        revealAndScheduleQuizAdvance(g);
         pushState(g);
       } else if (m.t === 'start') {
         const g = games.get(m.gid); if (g && g.host === uid && g.status === 'lobby') startGame(g);
@@ -524,11 +537,47 @@ function startGame(g) {
   g.status = 'live';
   if (g.mode === 'quiz') {
     g.quiz.scores = new Map(joined(g).map(([uid]) => [uid, { correct: 0, answered: 0, details: [] }]));
+    scheduleQuizQuestionTimeout(g);
   } else {
     g.endsAt = Date.now() + (TEST_SECONDS ? TEST_SECONDS * 1000 : g.mins * 60000);
     g.timer = setTimeout(() => endGame(g), g.endsAt - Date.now());
   }
   pushState(g); pushLobby();
   if (g.mode !== 'quiz') aiTurn(g, true);
+}
+function scheduleQuizQuestionTimeout(g) {
+  const quiz = g.quiz;
+  clearTimeout(quiz.questionTimer);
+  quiz.questionEndsAt = Date.now() + 30_000;
+  quiz.advanceAt = quiz.questionEndsAt;
+  quiz.questionTimer = setTimeout(() => {
+    if (g.status !== 'live' || g.quiz !== quiz || quiz.revealed) return;
+    revealQuizQuestion(quiz, joined(g));
+    pushState(g);
+  }, 25_000);
+  clearTimeout(quiz.advanceTimer);
+  quiz.advanceTimer = setTimeout(async () => {
+    if (g.status !== 'live' || g.quiz !== quiz) return;
+    if (!quiz.revealed) {
+      revealQuizQuestion(quiz, joined(g));
+      pushState(g);
+    }
+    if (quiz.index + 1 >= quiz.questions.length) {
+      await endGame(g);
+      return;
+    }
+    quiz.index += 1;
+    quiz.currentAnswers.clear();
+    quiz.revealed = false;
+    quiz.questionEndsAt = null;
+    quiz.advanceAt = null;
+    scheduleQuizQuestionTimeout(g);
+    pushState(g);
+  }, 30_000);
+}
+function revealAndScheduleQuizAdvance(g) {
+  const quiz = g.quiz;
+  if (!quiz || !revealQuizQuestion(quiz, joined(g))) return;
+  clearTimeout(quiz.questionTimer);
 }
 server.listen(PORT, () => console.log('Running on http://localhost:' + PORT));
