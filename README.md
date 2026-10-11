@@ -15,6 +15,7 @@ AI scoring, leaderboard. Everything runs on the server, so friends only need the
 - Set `ADMIN_PASSWORD` on the server. The Moderator button appears once it is configured; sign in there to delete messages, block members from fan chat, or unblock them.
 - Chat posts and Cloudinary media references are saved in MongoDB. Uploaded photos and videos are stored in Cloudinary, so Render does not need a persistent disk for chat uploads.
 - Cloudinary and its account plan enforce upload size, format, and storage limits.
+- Role-play results prioritize how convincingly each player portrayed their selected character, including in-character dialogue, reactions to the scene, and staying in role. The complete transcript is context, but only that player's lines are scored; message quantity alone does not determine the acting score.
 
 ## Role-play safety and references
 - Role-play is text-only; its server rejects image/video attachments.

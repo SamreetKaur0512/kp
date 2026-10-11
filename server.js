@@ -4,6 +4,7 @@ import { WebSocketServer } from 'ws';
 import { MongoClient, ObjectId } from 'mongodb';
 import { v2 as cloudinary } from 'cloudinary';
 import { createCloudinaryStorage } from './cloudinary-storage.js';
+import { ACTING_CRITERIA, actingJudgePrompt } from './acting-judge.js';
 import crypto from 'crypto';
 import http from 'http';
 import path from 'path';
@@ -329,7 +330,6 @@ async function aiTurn(g, first = false) {
 }
 
 // ---------- scoring ----------
-const CR = [['character', 'Character accuracy', .3], ['emotion', 'Emotion & acting', .2], ['dialogue', 'Dialogue quality', .2], ['action', 'Actions in (brackets)', .15], ['consistency', 'Consistency', .15]];
 const verdict = p => p >= 85 ? 'Outstanding' : p >= 70 ? 'Very good' : p >= 55 ? 'Good' : p >= 40 ? 'Average' : 'Needs practice';
 async function judge(g, uid, p) {
   const mine = g.msgs.filter(m => m.uid === uid);
@@ -343,16 +343,23 @@ async function judge(g, uid, p) {
     a.forEach(x => det.push(['Q: ' + x.q, x.verdict, 'Your answer: ' + x.answer + (x.truth ? ' | Truth: ' + x.truth : '')]));
     return { pct, verdict: verdict(pct), det, strengths: [], improve: [], note: r.note || '', extra: `${c} correct, ${w} wrong, ${a.length - c - w} unsure (unsure are not counted). Score = correct / (correct + wrong).` };
   }
-  const P = `You are a strict but fair acting judge for a fan role-play game about Indian TV. Judge ONLY the lines spoken by the player playing "${p.char}" (lines starting with "${p.char}:").\n${sysPrompt(g).split('\n').find(l => l.startsWith('SCENARIO')) || ''} ${g.notes ? 'Host notes about the characters: ' + g.notes : ''}\nScore each criterion 0-10 using these anchors: 0-2 off-character or irrelevant; 3-4 weak; 5-6 acceptable/average; 7-8 good; 9-10 exceptional (rare). Do not inflate: typical casual players land between 4 and 7. Criteria: character (matches this character's personality, relationships, speaking style), emotion (believable range and reactions), dialogue (natural, relevant, moves the scene, suits the language), action (uses (bracket) actions/expressions, scene awareness), consistency (stays in role). For each give "evidence": a quote of at most 12 words from the player's own lines, or "no evidence". If unsure about the real show's characterisation, judge on internal consistency and say so in "note". Write feedback in English. Return ONLY JSON: {"character":{"score":0,"evidence":""},"emotion":{"score":0,"evidence":""},"dialogue":{"score":0,"evidence":""},"action":{"score":0,"evidence":""},"consistency":{"score":0,"evidence":""},"strengths":["",""],"improve":["",""],"note":""}\n\nScene transcript:\n${tr}`;
+  const playerLines = mine.map(m => `${m.who}: ${m.t}`).join('\n');
+  const P = actingJudgePrompt({
+    character: p.char,
+    scenario: sysPrompt(g).split('\n').find(l => l.startsWith('SCENARIO')) || '',
+    notes: g.notes,
+    lines: playerLines,
+    transcript: tr,
+  });
   const rs = (await Promise.all(Array.from({ length: JUDGES }, () => ai('You are an acting judge.', P, 900)))).map(parseJSON);
   let base = 0;
-  CR.forEach(([k, l, w]) => {
+  ACTING_CRITERIA.forEach(([k, l, w]) => {
     const s = rs.reduce((a, r) => a + Math.max(0, Math.min(10, +r[k]?.score || 0)), 0) / rs.length;
     base += s / 10 * w; det.push([l, s.toFixed(1) + '/10', rs[0][k]?.evidence || '']);
   });
-  const exp = Math.max(3, Math.round(g.mins * 1.2)), f = .6 + .4 * Math.min(1, mine.length / exp), pct = Math.max(0, Math.min(100, base * 100 * f));
+  const exp = Math.max(3, Math.round(g.mins * 1.2)), f = .8 + .2 * Math.min(1, mine.length / exp), pct = Math.max(0, Math.min(100, base * 100 * f));
   return { pct, verdict: verdict(pct), det, strengths: rs[0].strengths || [], improve: rs[0].improve || [], note: rs[0].note || '',
-    extra: `Score = ${JUDGES === 1 ? 'one AI judge' : 'average of ' + JUDGES + ' independent AI judges'}, weighted (character 30%, emotion 20%, dialogue 20%, actions 15%, consistency 15%), times a participation factor of ${f.toFixed(2)} (${mine.length} lines played, about ${exp} expected for ${g.mins} min).` };
+    extra: `Score = ${JUDGES === 1 ? 'one AI judge' : 'average of ' + JUDGES + ' independent AI judges'}, weighted (character portrayal 40%, in-character dialogue and interaction 25%, emotion 15%, actions 10%, consistency 10%), times a modest participation factor of ${f.toFixed(2)} (${mine.length} lines played, about ${exp} expected for ${g.mins} min). Message quantity alone does not determine the acting score.` };
 }
 async function endGame(g) {
   if (g.status !== 'live') return;
