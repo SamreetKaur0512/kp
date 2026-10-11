@@ -7,6 +7,7 @@ import { createCloudinaryStorage } from './cloudinary-storage.js';
 import { ACTING_CRITERIA, actingJudgePrompt } from './acting-judge.js';
 import { buildQuiz, QUIZ_QUESTION_COUNTS, quizPlayerResult, revealQuizQuestion, submitQuizAnswer } from './quiz-game.js';
 import { removeHumanCharacterLines, roleplaySystemPrompt, roleplayTurnPrompt } from './roleplay.js';
+import { fanChatHistoryFilter } from './fan-chat-history.js';
 import crypto from 'crypto';
 import http from 'http';
 import path from 'path';
@@ -82,7 +83,7 @@ app.post('/api/register', async (req, res) => {
     if (!/^[\p{L}\p{N} _.-]{2,20}$/u.test(nm)) return res.status(400).json({ error: 'Name must be 2-20 letters/numbers.' });
     if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     const salt = crypto.randomBytes(16).toString('hex'), id = await nextId();
-    try { await Users.insertOne({ _id: id, name: nm, nameLower: nm.toLowerCase(), pub: await newPub(), salt, hash: hash(String(password), salt), wins: 0, played: 0 }); }
+    try { await Users.insertOne({ _id: id, name: nm, nameLower: nm.toLowerCase(), pub: await newPub(), salt, hash: hash(String(password), salt), wins: 0, played: 0, createdAt: new Date() }); }
     catch (e) { if (e.code === 11000) return res.status(400).json({ error: 'That name is already taken.' }); throw e; }
     setCookie(req, res, await newSession(id));
     res.json(pubUser(await userById(id)));
@@ -128,8 +129,8 @@ const signedIn = async (req, res, next) => {
 };
 app.get('/api/fan-chat', async (req, res) => {
   try {
-    const posts = await FanChat.find({}).sort({ createdAt: -1, _id: -1 }).limit(100).toArray();
     const viewer = await userBySid(cookie(req, 'sid') || '');
+    const posts = await FanChat.find(fanChatHistoryFilter(viewer)).sort({ createdAt: -1, _id: -1 }).limit(100).toArray();
     const userIds = [...new Set(posts.filter(post => !post.deleted && post.uid != null).map(post => post.uid))];
     const users = await Users.find({ _id: { $in: userIds } }).project({ name: 1 }).toArray();
     const names = new Map(users.map(user => [user._id, user.name]));
