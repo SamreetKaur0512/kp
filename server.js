@@ -194,6 +194,7 @@ async function clearHostNotifications(gameId) {
   const tag = `host-${gameId}`;
   const entries = await Notifications.find({ tag }).project({ uid: 1 }).toArray();
   await Notifications.deleteMany({ tag });
+  for (const uid of new Set(entries.map(entry => entry.uid))) sendUser(uid, { t: 'notificationRemove', tag });
   if (!entries.length || !process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY || !process.env.VAPID_SUBJECT) return;
   try {
     const webpush = (await import('web-push')).default;
@@ -720,7 +721,7 @@ wss.on('connection', (ws, req) => {
           title: mode === 'serial' ? show : MODES[mode], players: new Map([[uid, player]]), msgs: [], results: new Map(),
         };
         games.set(id, g);
-        if (!g.solo) for (const member of await Users.find({ _id: { $ne: uid }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'A game is starting', `${me.name} started ${g.title}. Game ID: ${id}.`, `host-${id}`, uid);
+        if (!g.solo) for (const member of await Users.find({ _id: { $ne: uid }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'Game hosted — not started', `${me.name} is hosting ${g.title}. Game ID: ${id}. The host has not started it yet.`, `host-${id}`, uid);
         if (g.solo) startGame(g); else { pushState(g); pushLobby(); }
       } else if (m.t === 'join') {
         const g = games.get(m.gid); if (!g || g.status !== 'lobby') return err('Game not found, or it has already started.');
