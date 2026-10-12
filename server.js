@@ -163,7 +163,7 @@ app.post('/api/push-test', accountUser, async (req, res) => {
     if (!sub) return res.status(404).json({ error: 'This device is not subscribed yet. Enable notifications again on this device.' });
     const webpush = (await import('web-push')).default;
     webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
-    await webpush.sendNotification(sub.subscription, JSON.stringify({ title: 'Test notification', body: 'Push notifications are reaching this device.', tag: 'push-test' }), { TTL: 60, urgency: 'high' });
+    await webpush.sendNotification(sub.subscription, JSON.stringify({ title: 'Karan Patel Fan Club', body: 'Website notifications are enabled on this device.', tag: 'notifications-enabled' }), { TTL: 60, urgency: 'high' });
     res.json({ ok: true });
   } catch (error) {
     console.error('Push test failed:', error.statusCode, error.body || error.message);
