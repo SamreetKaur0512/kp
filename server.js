@@ -90,8 +90,8 @@ app.post('/api/register', async (req, res) => {
     const createdAt = new Date();
     try { await Users.insertOne({ _id: id, name: nm, nameLower: nm.toLowerCase(), pub: await newPub(), salt, hash: hash(String(password), salt), wins: 0, played: 0, notifications: false, createdAt }); }
     catch (e) { if (e.code === 11000) return res.status(400).json({ error: 'That name is already taken.' }); throw e; }
-    await FanChat.insertOne({ kind: 'system', body: `${nm} joined the fan community! Welcome 🎉`, createdAt, reactions: {} });
-    for (const member of await Users.find({ _id: { $ne: id }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'New fan joined', `${nm} joined the community.`);
+    await FanChat.insertOne({ kind: 'system', joinUid: id, body: `${nm} joined the fan community! Welcome 🎉`, createdAt, reactions: {} });
+    for (const member of await Users.find({ _id: { $ne: id }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'New fan joined', `${nm} joined the community.`, 'community', id);
     setCookie(req, res, await newSession(id));
     res.json(pubUser(await userById(id)));
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error. Please try again.' }); }
@@ -108,12 +108,12 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/logout', async (req, res) => { try { await Sessions.deleteOne({ token: cookie(req, 'sid') || '' }); } catch (e) { console.error(e); } res.json({ ok: 1 }); });
 app.get('/api/me', async (req, res) => { try { const u = await userBySid(cookie(req, 'sid')); u ? res.json(pubUser(u)) : res.status(401).json({}); } catch (e) { res.status(500).json({}); } });
 const accountUser = async (req, res, next) => { try { const u = await userBySid(cookie(req, 'sid')); if (!u) return res.status(401).json({ error: 'Sign in first.' }); req.accountUser = u; next(); } catch { res.status(500).json({ error: 'Could not verify your account.' }); } };
-async function notify(uid, title, body, tag = 'community') {
+async function notify(uid, title, body, tag = 'community', actorUid = null) {
   try {
   const recipient = await Users.findOne({ _id: uid }, { projection: { notifications: 1 } });
   if (!recipient || recipient.notifications !== true) return;
   const createdAt = new Date();
-  await Notifications.insertOne({ uid, title, body, tag, createdAt, expiresAt: new Date(createdAt.getTime() + 86400000), read: false });
+  await Notifications.insertOne({ uid, title, body, tag, actorUid, actorName: actorUid == null ? null : (await Users.findOne({ _id: actorUid }, { projection: { name: 1 } }))?.name || null, createdAt, expiresAt: new Date(createdAt.getTime() + 86400000), read: false });
   sendUser(uid, { t: 'notification', notification: { title, body, tag, createdAt: createdAt.getTime() } });
   const connected = [...(online.get(uid) || [])].some(socket => socket.readyState === 1);
   if (!connected && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT) {
@@ -128,7 +128,24 @@ async function notify(uid, title, body, tag = 'community') {
 }
 app.get('/api/settings', accountUser, (req, res) => res.json({ notifications: req.accountUser.notifications === true, pushKey: process.env.VAPID_PUBLIC_KEY || '' }));
 app.patch('/api/settings', accountUser, async (req, res) => { try { const notifications = req.body?.notifications; if (typeof notifications !== 'boolean') return res.status(400).json({ error: 'Choose whether notifications are on or off.' }); await Users.updateOne({ _id: req.accountUser._id }, { $set: { notifications } }); res.json({ notifications }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not save notification settings.' }); } });
-app.get('/api/notifications', accountUser, async (req, res) => { try { const items = await Notifications.find({ uid: req.accountUser._id, expiresAt: { $gt: new Date() } }).sort({ createdAt: -1 }).limit(100).toArray(); res.json({ notifications: items.map(n => ({ id: n._id.toString(), title: n.title, body: n.body, tag: n.tag, createdAt: n.createdAt.getTime(), read: n.read })) }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load notifications.' }); } });
+app.patch('/api/account/name', accountUser, async (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  if (!/^[\p{L}\p{N} _.-]{2,20}$/u.test(name)) return res.status(400).json({ error: 'Name must be 2-20 letters/numbers.' });
+  try {
+    const escapedName = req.accountUser.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await FanChat.updateMany({ kind: 'system', joinUid: { $exists: false }, body: { $regex: `^${escapedName} joined the fan community!` } }, { $set: { joinUid: req.accountUser._id } });
+    const olderNotices = await Notifications.find({ actorUid: { $exists: false }, body: { $regex: `^${escapedName} ` } }).project({ _id: 1 }).toArray();
+    if (olderNotices.length) await Notifications.updateMany({ _id: { $in: olderNotices.map(item => item._id) } }, { $set: { actorUid: req.accountUser._id, actorName: req.accountUser.name } });
+    await Users.updateOne({ _id: req.accountUser._id }, { $set: { name, nameLower: name.toLowerCase() } });
+    for (const game of games.values()) { const player = game.players.get(req.accountUser._id); if (player) { player.name = name; pushState(game); } }
+    online.get(req.accountUser._id)?.forEach(socket => socket.close(4002));
+    res.json({ name, id: req.accountUser.pub });
+  } catch (error) {
+    if (error.code === 11000) return res.status(409).json({ error: 'That name is already taken.' });
+    console.error(error); res.status(500).json({ error: 'Could not change your name.' });
+  }
+});
+app.get('/api/notifications', accountUser, async (req, res) => { try { const items = await Notifications.find({ uid: req.accountUser._id, expiresAt: { $gt: new Date() } }).sort({ createdAt: -1 }).limit(100).toArray(); const actorIds = [...new Set(items.map(item => item.actorUid).filter(id => id != null))]; const actors = await Users.find({ _id: { $in: actorIds } }).project({ name: 1 }).toArray(); const actorNames = new Map(actors.map(actor => [actor._id, actor.name])); res.json({ notifications: items.map(n => { const actorName = actorNames.get(n.actorUid); return { id: n._id.toString(), title: n.title, body: actorName && n.actorName ? n.body.replace(n.actorName, actorName) : n.body, tag: n.tag, createdAt: n.createdAt.getTime(), read: n.read }; }) }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load notifications.' }); } });
 app.post('/api/notifications/read', accountUser, async (req, res) => { try { await Notifications.updateMany({ uid: req.accountUser._id, read: false }, { $set: { read: true } }); res.json({ ok: true }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not update notifications.' }); } });
 app.post('/api/push-subscription', accountUser, async (req, res) => { try { const s = req.body?.subscription; if (!s?.endpoint || !s?.keys?.p256dh || !s?.keys?.auth) return res.status(400).json({ error: 'Invalid push subscription.' }); await PushSubscriptions.updateOne({ uid: req.accountUser._id, endpoint: s.endpoint }, { $set: { subscription: s } }, { upsert: true }); res.json({ ok: true }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not save push subscription.' }); } });
 app.delete('/api/push-subscription', accountUser, async (req, res) => { try { const endpoint = String(req.body?.endpoint || ''); await PushSubscriptions.deleteOne({ uid: req.accountUser._id, endpoint }); res.json({ ok: true }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not remove push subscription.' }); } });
@@ -194,11 +211,11 @@ app.get('/api/fan-chat', async (req, res) => {
   try {
     const viewer = await userBySid(cookie(req, 'sid') || '');
     const posts = await FanChat.find({}).sort({ createdAt: -1, _id: -1 }).limit(100).toArray();
-    const userIds = [...new Set(posts.flatMap(post => [post.uid, ...collectReplyUserIds(post.replies || []), ...Object.values(post.reactions || {}).flatMap(users => users || [])]).filter(id => id != null))];
+    const userIds = [...new Set(posts.flatMap(post => [post.uid, post.joinUid, ...collectReplyUserIds(post.replies || []), ...Object.values(post.reactions || {}).flatMap(users => users || [])]).filter(id => id != null))];
     const users = await Users.find({ _id: { $in: userIds } }).project({ name: 1 }).toArray();
     const names = new Map(users.map(user => [user._id, user.name]));
     const messages = posts.reverse().flatMap(post => {
-      if (post.kind === 'system') return [{ id: post._id.toString(), system: true, body: post.body, created_at: post.createdAt.getTime(), reactions: reactionSummary(post.reactions, names, viewer) }];
+      if (post.kind === 'system') return [{ id: post._id.toString(), system: true, body: names.has(post.joinUid) ? `${names.get(post.joinUid)} joined the fan community! Welcome 🎉` : post.body, created_at: post.createdAt.getTime(), reactions: reactionSummary(post.reactions, names, viewer) }];
       if (post.deleted) return [{ id: post._id.toString(), deleted: true, body: post.body, created_at: post.createdAt.getTime(), media: [], reactions: [], replies: [] }];
       if (!names.has(post.uid)) return [];
       return [{
@@ -242,7 +259,7 @@ app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
         mime: file.mimetype,
       })),
     });
-    for (const member of await Users.find({ _id: { $ne: req.user._id }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'New fan chat message', `${req.user.name} sent a message in the fan chat.`);
+    for (const member of await Users.find({ _id: { $ne: req.user._id }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'New fan chat message', `${req.user.name} sent a message in the fan chat.`, 'community', req.user._id);
     res.status(201).json({ ok: true });
   } catch (error) {
     try {
@@ -265,7 +282,7 @@ async function updateReaction(req, res, target) {
   if (updated.length) bucket[emoji] = updated; else delete bucket[emoji];
   await FanChat.updateOne({ _id: post._id }, { $set: target === 'reply' ? { replies: post.replies } : { reactions: post.reactions } });
   const owner = target === 'reply' ? reply.uid : post.uid;
-  if (added && owner != null && owner !== req.user._id) await notify(owner, 'New reaction', `${req.user.name} reacted ${emoji} to your ${target === 'reply' ? 'reply' : 'message'}.`, 'chat-reaction');
+  if (added && owner != null && owner !== req.user._id) await notify(owner, 'New reaction', `${req.user.name} reacted ${emoji} to your ${target === 'reply' ? 'reply' : 'message'}.`, 'chat-reaction', req.user._id);
   res.json({ ok: true });
 }
 for (const target of ['message', 'reply']) {
@@ -286,7 +303,7 @@ app.post('/api/fan-chat/:id/replies', signedIn, async (req, res) => {
     post.replies ||= []; post.replies.push(reply);
     const result = await FanChat.updateOne({ _id: post._id }, { $set: { replies: post.replies } });
     if (!result.modifiedCount) return res.status(404).json({ error: 'Message not found.' });
-    if (post.uid != null && post.uid !== req.user._id) await notify(post.uid, 'New reply', `${req.user.name} replied to your chat message.`, 'chat-reply');
+    if (post.uid != null && post.uid !== req.user._id) await notify(post.uid, 'New reply', `${req.user.name} replied to your chat message.`, 'chat-reply', req.user._id);
     res.status(201).json({ ok: true });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not send reply.' }); }
 });
@@ -302,7 +319,7 @@ app.post('/api/fan-chat/:id/replies/:replyId/replies', signedIn, async (req, res
     parent.replies ||= []; parent.replies.push(reply);
     const result = await FanChat.updateOne({ _id: postId }, { $set: { replies: post.replies } });
     if (!result.modifiedCount) return res.status(404).json({ error: 'Reply not found.' });
-    if (parent.uid != null && parent.uid !== req.user._id) await notify(parent.uid, 'New reply', `${req.user.name} replied to your chat reply.`, 'chat-reply');
+    if (parent.uid != null && parent.uid !== req.user._id) await notify(parent.uid, 'New reply', `${req.user.name} replied to your chat reply.`, 'chat-reply', req.user._id);
     res.status(201).json({ ok: true });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not send reply.' }); }
 });
@@ -330,7 +347,7 @@ app.post('/api/fan-chat/:id/replies/:replyId/replies/:childId/replies', signedIn
     if (!parent || parent.deleted) return res.status(404).json({ error: 'Reply not found.' });
     parent.replies ||= []; parent.replies.push(reply);
     await FanChat.updateOne({ _id: postId }, { $set: { replies: post.replies } });
-    if (parent.uid != null && parent.uid !== req.user._id) await notify(parent.uid, 'New reply', `${req.user.name} replied to your chat reply.`, 'chat-reply');
+    if (parent.uid != null && parent.uid !== req.user._id) await notify(parent.uid, 'New reply', `${req.user.name} replied to your chat reply.`, 'chat-reply', req.user._id);
     res.status(201).json({ ok: true });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not send reply.' }); }
 });
@@ -680,7 +697,7 @@ wss.on('connection', (ws, req) => {
           title: mode === 'serial' ? show : MODES[mode], players: new Map([[uid, player]]), msgs: [], results: new Map(),
         };
         games.set(id, g);
-        if (!g.solo) for (const member of await Users.find({ _id: { $ne: uid }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'A game is starting', `${me.name} started ${g.title}. Game ID: ${id}.`, `host-${id}`);
+        if (!g.solo) for (const member of await Users.find({ _id: { $ne: uid }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'A game is starting', `${me.name} started ${g.title}. Game ID: ${id}.`, `host-${id}`, uid);
         if (g.solo) startGame(g); else { pushState(g); pushLobby(); }
       } else if (m.t === 'join') {
         const g = games.get(m.gid); if (!g || g.status !== 'lobby') return err('Game not found, or it has already started.');
