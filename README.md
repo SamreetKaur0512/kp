@@ -23,7 +23,7 @@ AI scoring, leaderboard. Everything runs on the server, so friends only need the
 - Members choose whether to receive notifications at registration and can change that choice in Settings. They receive private alerts when their messages or replies get a reply or reaction. The inbox expires notices after 24 hours. For phone/browser notifications while the site is closed, configure `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` in the server environment; browser push also requires a supported browser and permission from the member. Host notices are removed from the in-app inbox when the game starts.
 - Members can change their account name in Settings; chat history and the public average-score leaderboard show the current name.
 - Generate a VAPID key pair with `npx web-push generate-vapid-keys`, set the public and private values in the server environment, and set `VAPID_SUBJECT` to a contact such as `mailto:admin@example.com`. Serve the app over HTTPS for browser push.
-- In Settings, turn notifications on and allow the browser permission prompt; use **Send a test notification** to check this exact device's subscription and server delivery. Existing accounts default to notifications off until they opt in.
+- In Settings, turn notifications on to subscribe this device and send a confirmation push; allow the browser permission prompt. Existing accounts default to notifications off until they opt in.
 - The login screen and fan room prominently warn that AI role-play and quiz answers can be inaccurate; verify important facts.
 
 ## Role-play safety and references
