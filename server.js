@@ -261,8 +261,11 @@ async function updateReaction(req, res, target) {
   if (!post || (target === 'reply' && (!reply || reply.deleted))) return res.status(404).json({ error: 'Message not found.' });
   const bucket = target === 'reply' ? (reply.reactions ||= {}) : (post.reactions ||= {});
   const current = bucket[emoji] || [], updated = current.includes(req.user._id) ? current.filter(uid => uid !== req.user._id) : [...current, req.user._id];
+  const added = !current.includes(req.user._id);
   if (updated.length) bucket[emoji] = updated; else delete bucket[emoji];
   await FanChat.updateOne({ _id: post._id }, { $set: target === 'reply' ? { replies: post.replies } : { reactions: post.reactions } });
+  const owner = target === 'reply' ? reply.uid : post.uid;
+  if (added && owner != null && owner !== req.user._id) await notify(owner, 'New reaction', `${req.user.name} reacted ${emoji} to your ${target === 'reply' ? 'reply' : 'message'}.`, 'chat-reaction');
   res.json({ ok: true });
 }
 for (const target of ['message', 'reply']) {
@@ -283,6 +286,7 @@ app.post('/api/fan-chat/:id/replies', signedIn, async (req, res) => {
     post.replies ||= []; post.replies.push(reply);
     const result = await FanChat.updateOne({ _id: post._id }, { $set: { replies: post.replies } });
     if (!result.modifiedCount) return res.status(404).json({ error: 'Message not found.' });
+    if (post.uid != null && post.uid !== req.user._id) await notify(post.uid, 'New reply', `${req.user.name} replied to your chat message.`, 'chat-reply');
     res.status(201).json({ ok: true });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not send reply.' }); }
 });
@@ -298,6 +302,7 @@ app.post('/api/fan-chat/:id/replies/:replyId/replies', signedIn, async (req, res
     parent.replies ||= []; parent.replies.push(reply);
     const result = await FanChat.updateOne({ _id: postId }, { $set: { replies: post.replies } });
     if (!result.modifiedCount) return res.status(404).json({ error: 'Reply not found.' });
+    if (parent.uid != null && parent.uid !== req.user._id) await notify(parent.uid, 'New reply', `${req.user.name} replied to your chat reply.`, 'chat-reply');
     res.status(201).json({ ok: true });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not send reply.' }); }
 });
@@ -325,6 +330,7 @@ app.post('/api/fan-chat/:id/replies/:replyId/replies/:childId/replies', signedIn
     if (!parent || parent.deleted) return res.status(404).json({ error: 'Reply not found.' });
     parent.replies ||= []; parent.replies.push(reply);
     await FanChat.updateOne({ _id: postId }, { $set: { replies: post.replies } });
+    if (parent.uid != null && parent.uid !== req.user._id) await notify(parent.uid, 'New reply', `${req.user.name} replied to your chat reply.`, 'chat-reply');
     res.status(201).json({ ok: true });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not send reply.' }); }
 });
