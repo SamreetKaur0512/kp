@@ -121,7 +121,7 @@ async function notify(uid, title, body, tag = 'community', actorUid = null) {
       const webpush = (await import('web-push')).default;
       webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
       const subs = await PushSubscriptions.find({ uid }).toArray();
-      await Promise.all(subs.map(async sub => { try { await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, tag }), { TTL: 86400 }); } catch (error) { if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ _id: sub._id }); } }));
+      await Promise.all(subs.map(async sub => { try { await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, tag }), { TTL: 86400, urgency: 'high' }); } catch (error) { if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ _id: sub._id }); } }));
     } catch (error) { console.error('Push notification failed:', error.message); }
   }
   } catch (error) { console.error('Could not create notification:', error.message); }
@@ -149,6 +149,28 @@ app.get('/api/notifications', accountUser, async (req, res) => { try { const ite
 app.post('/api/notifications/read', accountUser, async (req, res) => { try { await Notifications.updateMany({ uid: req.accountUser._id, read: false }, { $set: { read: true } }); res.json({ ok: true }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not update notifications.' }); } });
 app.post('/api/push-subscription', accountUser, async (req, res) => { try { const s = req.body?.subscription; if (!s?.endpoint || !s?.keys?.p256dh || !s?.keys?.auth) return res.status(400).json({ error: 'Invalid push subscription.' }); await PushSubscriptions.updateOne({ uid: req.accountUser._id, endpoint: s.endpoint }, { $set: { subscription: s } }, { upsert: true }); res.json({ ok: true }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not save push subscription.' }); } });
 app.delete('/api/push-subscription', accountUser, async (req, res) => { try { const endpoint = String(req.body?.endpoint || ''); await PushSubscriptions.deleteOne({ uid: req.accountUser._id, endpoint }); res.json({ ok: true }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not remove push subscription.' }); } });
+app.get('/api/push-status', accountUser, async (req, res) => {
+  try { const subscriptions = await PushSubscriptions.find({ uid: req.accountUser._id }).project({ endpoint: 1 }).toArray(); res.json({ configured: Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT), endpoints: subscriptions.map(item => item.endpoint), enabled: req.accountUser.notifications === true }); }
+  catch (error) { console.error(error); res.status(500).json({ error: 'Could not check push status.' }); }
+});
+app.post('/api/push-test', accountUser, async (req, res) => {
+  try {
+    if (req.accountUser.notifications !== true) return res.status(400).json({ error: 'Turn on notifications in Settings first.' });
+    if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY || !process.env.VAPID_SUBJECT) return res.status(503).json({ error: 'The server is missing one or more VAPID settings.' });
+    const endpoint = String(req.body?.endpoint || '');
+    const sub = endpoint ? await PushSubscriptions.findOne({ uid: req.accountUser._id, endpoint }) : null;
+    if (!sub) return res.status(404).json({ error: 'This device is not subscribed yet. Enable notifications again on this device.' });
+    const webpush = (await import('web-push')).default;
+    webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+    await webpush.sendNotification(sub.subscription, JSON.stringify({ title: 'Test notification', body: 'Push notifications are reaching this device.', tag: 'push-test' }), { TTL: 60, urgency: 'high' });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Push test failed:', error.statusCode, error.body || error.message);
+    if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ uid: req.accountUser._id });
+    const message = error.statusCode === 401 ? 'The VAPID keys do not match this device subscription. Turn notifications off and on again on this device.' : error.statusCode === 404 || error.statusCode === 410 ? 'This device subscription expired. Turn notifications off and on again on this device.' : error.statusCode === 400 ? 'The push service rejected the VAPID settings. Check that VAPID_SUBJECT starts with mailto: and the key pair matches.' : `The push service returned HTTP ${error.statusCode || 'error'}. Check the Render server logs.`;
+    res.status(502).json({ error: message });
+  }
+});
 function redactDeletedMember(replies, uid) {
   for (const reply of replies || []) {
     if (reply.uid === uid) { reply.deleted = true; reply.body = 'This reply was deleted.'; delete reply.uid; }
