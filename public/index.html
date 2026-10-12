@@ -76,6 +76,7 @@ body{background:radial-gradient(ellipse at top left,#fff4df 0,transparent 36%),r
 input,select,textarea{min-width:0;border-radius:10px}
 .masthead{border-bottom-color:#cfddd7}
 @media(max-width:600px){.quiz-options{grid-template-columns:1fr}.quiz-option{min-height:52px}.quiz-panel{border-radius:16px;padding:18px}.quiz-score-row{font-size:13px}.card{padding:16px}}
+.top-three{margin-bottom:20px;background:linear-gradient(115deg,#fff8d8,#ffe8f0 48%,#e4f8ff);border:1px solid #f2d3a0}.top-player-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.top-player{padding:15px;border-radius:15px;background:linear-gradient(140deg,#fff,#f5f7ff);border:1px solid #ddd8ff}.top-player:nth-child(1){background:linear-gradient(140deg,#fff3b8,#fff)}.top-player:nth-child(2){background:linear-gradient(140deg,#e3f3ff,#fff)}.top-player:nth-child(3){background:linear-gradient(140deg,#ffe8d8,#fff)}.top-rank{font-size:1.2rem}.top-name{font-weight:800;display:block;margin:5px 0}.notification-item{padding:12px 0;border-bottom:1px solid var(--line)}@media(max-width:600px){.top-player-list{grid-template-columns:1fr}}
 </style></head><body><main>
 
 <div id="auth">
@@ -88,12 +89,14 @@ input,select,textarea{min-width:0;border-radius:10px}
     <input id="apass" type="password" placeholder="Password (min 6 characters)" autocomplete="current-password" style="margin-top:8px">
     <p><button class="btn" id="abtn">Login</button> <button class="btn alt" id="aswitch">New here? Register</button></p>
     <div class="small" id="aerr"></div>
+    <p class="small">If you register, we’ll ask whether you want website notifications. You can change your choice anytime in Settings.</p>
     <div class="small" style="margin-top:8px">Your game chat is sent to an AI provider to generate replies and scores. The provider (e.g. Google's free tier) may use it to improve its products. Please do not share personal information.</div>
   </div>
 </div>
 
 <div id="home" class="hide">
-  <header class="masthead"><div class="brand-lockup"><span class="brand-mark">KP</span><div><strong>Karan Patel Fan Club</strong><span class="small">A fan-made community</span></div></div><div class="account"><span><span class="account-name" id="me"></span> <span class="small" id="myid"></span></span><button class="btn alt" id="logout">Log out</button></div></header>
+  <header class="masthead"><div class="brand-lockup"><span class="brand-mark">KP</span><div><strong>Karan Patel Fan Club</strong><span class="small">A fan-made community</span></div></div><div class="account"><span><span class="account-name" id="me"></span> <span class="small" id="myid"></span></span><button class="btn alt" id="notificationsOpen">Notifications <span id="notificationCount"></span></button><button class="btn alt" id="settingsOpen">Settings</button><button class="btn alt" id="logout">Log out</button></div></header>
+  <section class="card leader-card top-three"><h2>🌟 Community top players</h2><p class="small">Best average scores across every quiz and role-play game, including solo games.</p><div id="board" class="top-player-list">No games scored yet.</div></section>
   <aside class="ai-warning" role="note" aria-label="Important AI accuracy warning"><strong>IMPORTANT: AI ROLE-PLAY AND QUIZ ANSWERS CAN BE WRONG</strong><p>AI may portray characters inaccurately, misunderstand the scene, or give incorrect facts and answers. This is fan-made entertainment, not an official source. Please verify important information.</p></aside>
   <section class="fan-intro"><div><p class="eyebrow">Fans, stories &amp; everything Karan</p><h1>Welcome to the fan room.</h1><p>Share a moment, a memory, or the latest reel.</p></div><div class="room-count"><span class="live-dot"></span><span id="fanCount">Community chat</span></div></section>
   <div class="community-layout">
@@ -107,12 +110,15 @@ input,select,textarea{min-width:0;border-radius:10px}
       <section class="card show-card" id="showBox"><h2>Choose a show</h2><div class="opts" id="shows"></div><input id="showCustom" placeholder="Or type another show / project"></section>
       <section class="card game-card"><div id="roleBox"><h2 id="charH">Character you will play</h2><input id="char" placeholder="Enter the character you want to play"><p class="small">Your account name is shown separately; type the show character you want to portray.</p></div><h2>Language</h2><input id="lang" value="Hinglish" placeholder="Hindi, Hinglish, English..."><div id="lengthBox"><h2>Role-play length</h2><select id="mins"><option>2</option><option selected>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select></div><div id="questionCountBox" class="hide"><h2>Number of quiz questions</h2><select id="questionCount"><option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select><p class="small">Every question has four options. No game timer.</p></div><p class="row" style="margin-top:12px"><button class="btn" id="solo">Play solo</button><button class="btn alt" id="host">Host a game</button></p><div class="small" id="err" role="alert"></div></section>
       <section class="card"><h2>Join a game</h2><div class="row"><input id="code" placeholder="Game ID"><button class="btn alt" id="joinc">Join</button></div><div class="small" id="joinStatus" role="alert"></div><h2 style="margin-top:18px">Open games</h2><div id="open" class="small">None right now.</div></section>
-      <section class="card leader-card"><h2>Top players</h2><div id="board" class="small">No wins yet.</div></section>
       <section class="card warn"><b>Fan-made game.</b> Not affiliated with or endorsed by Karan Patel or his team. AI replies and scores may be inaccurate and do not represent any real person's words or opinions.</section>
     </aside>
   </div>
   <dialog id="modDialog"><div class="dialog-inner"><div class="section-title"><h2>Moderator access</h2><button class="text-btn" id="modClose" type="button" aria-label="Close">Close</button></div><form id="modForm"><label class="small" for="modPassword">Moderator password</label><input id="modPassword" type="password" autocomplete="current-password" required><button class="btn" id="modSubmit" type="submit">Sign in</button><div class="chat-status" id="modStatus" role="status"></div></form><div id="modTools" class="hide"><div class="section-title" style="margin-top:20px"><h3>Manage fan chat access</h3><button class="text-btn" id="modLogout" type="button">Sign out</button></div><label class="small" for="memberSearch">Find members to block or unblock</label><input id="memberSearch" type="search" maxlength="20" placeholder="Search by the start of a username"><div class="small">Showing up to 50 members. Search by username to find someone specific.</div><div id="memberList" class="member-list" aria-live="polite"></div><h3>Blocked users</h3><div class="small">Unblock a user here, or use the member list above to change access.</div><div id="blockedList"></div></div></div></dialog>
 </div>
+
+<dialog id="notificationDialog"><div class="dialog-inner"><div class="section-title"><h2>Notifications</h2><button class="text-btn" type="button" data-close="notificationDialog">Close</button></div><div id="notificationList" aria-live="polite"></div></div></dialog>
+<dialog id="settingsDialog"><div class="dialog-inner"><div class="section-title"><h2>Settings</h2><button class="text-btn" type="button" data-close="settingsDialog">Close</button></div><label><input id="notificationSetting" type="checkbox"> Receive website notifications</label><p class="small">You can change this any time. Notifications disappear after 24 hours. Browser push can also appear when the site is closed if this device supports it.</p><div id="settingsStatus" class="small" role="status"></div><hr><h3>Delete account</h3><p class="small">This permanently deletes your account, saved scores, notifications, and chat posts.</p><button class="btn alt" id="deleteAccount" type="button">Delete my account</button></div></dialog>
+<dialog id="notificationConsent"><div class="dialog-inner"><h2>Stay in the loop?</h2><p>Would you like to receive website notifications when someone joins, sends a fan chat message, starts a game, or when you reach the top three? You can change this later in Settings.</p><div class="row"><button class="btn" id="consentYes" type="button">Yes, notify me</button><button class="btn alt" id="consentNo" type="button">No thanks</button></div><p class="small">You can change your choice anytime in Settings.</p></div></dialog>
 
 <div id="lobby" class="hide">
   <div class="card"><div class="small">Game ID (share with friends)</div><h1 id="gid"></h1><div id="ginfo" class="small"></div></div>
@@ -147,7 +153,7 @@ function actionStatus(id,message,isError=false){
 }
 const MODES={serial:"Serial Role-Play",quiz:"Karan Patel Quiz"};
 const SHOWS=["Yeh Hai Mohabbatein","Kasautii Zindagii Kay","Kuch Toh Log Kahenge","Qayamat Ki Raat","Ek Hasina Thi","Ishq Mein Marjawan"];
-let ws,me=null,mode="serial",show="",G=null,tId=null,off=0,regMode=false,shown="",fanPoll=null,isModerator=false,joinPending=false;
+let ws,me=null,mode="serial",show="",G=null,tId=null,off=0,regMode=false,shown="",fanPoll=null,isModerator=false,joinPending=false,notificationUnread=0,pushKey="";
 const screen=n=>["auth","home","lobby","play","result"].forEach(s=>$(s).classList.toggle("hide",s!==n));
 
 // ---- auth ----
@@ -155,10 +161,18 @@ function setReg(r){regMode=r;$("authTitle").textContent=r?"Register":"Login";$("
 $("aswitch").onclick=()=>setReg(!regMode);$("logoLink").onclick=e=>{e.preventDefault();setReg(true);$("aname").focus()};
 $("abtn").onclick=async()=>{
   const r=await fetch("/api/"+(regMode?"register":"login"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name:$("aname").value,password:$("apass").value})});
-  const j=await r.json();if(!r.ok){$("aerr").textContent=j.error;return}enter(j)};
+  const j=await r.json();if(!r.ok){$("aerr").textContent=j.error;return}enter(j,regMode)};
 $("logout").onclick=async()=>{await fetch("/api/logout",{method:"POST"});location.reload()};
 (async()=>{const r=await fetch("/api/me");if(r.ok)enter(await r.json())})();
-function enter(u){me=u;$("me").textContent=u.name;$("myid").textContent="(ID "+u.id+")";screen("home");connect();loadFanChat();refreshModerator();clearInterval(fanPoll);fanPoll=setInterval(loadFanChat,5000)}
+function enter(u,justRegistered=false){me=u;$("me").textContent=u.name;$("myid").textContent="(ID "+u.id+")";screen("home");connect();loadFanChat();refreshModerator();loadSettings();loadNotifications();if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});clearInterval(fanPoll);fanPoll=setInterval(loadFanChat,5000);if(justRegistered)$("notificationConsent").showModal()}
+async function loadSettings(){try{const r=await fetch("/api/settings");if(!r.ok)return;const j=await r.json();pushKey=j.pushKey||"";$("notificationSetting").checked=j.notifications}catch{}}
+async function loadNotifications(){try{const r=await fetch("/api/notifications");if(!r.ok)return;const j=await r.json(),list=$("notificationList");list.replaceChildren();notificationUnread=j.notifications.filter(n=>!n.read).length;$("notificationCount").textContent=notificationUnread?`(${notificationUnread})`:"";if(!j.notifications.length)list.textContent="No notifications yet.";for(const n of j.notifications){const item=mk(list,"div");item.className="notification-item";mk(item,"b",n.title);mk(item,"div",n.body);mk(item,"div",new Date(n.createdAt).toLocaleString()).className="small"}}catch{}}
+function notification(m){notificationUnread++;$("notificationCount").textContent=`(${notificationUnread})`;loadNotifications();if("Notification" in window&&Notification.permission==="granted")new Notification(m.notification.title,{body:m.notification.body,tag:m.notification.tag})}
+async function syncPush(enabled){if(!("serviceWorker" in navigator)||!pushKey)return;try{const registration=await navigator.serviceWorker.ready;let subscription=await registration.pushManager.getSubscription();if(enabled&&Notification.permission==="granted"){subscription ||= await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:Uint8Array.from(atob(pushKey.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0))});await fetch("/api/push-subscription",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({subscription})})}else if(subscription){await fetch("/api/push-subscription",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({endpoint:subscription.endpoint})});await subscription.unsubscribe()}}catch(error){$("settingsStatus").textContent="Browser push could not be enabled on this device."}}
+async function saveNotificationChoice(enabled){await fetch("/api/settings",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({notifications:enabled})});$("notificationSetting").checked=enabled;if(enabled&&"Notification" in window&&Notification.permission==="default")await Notification.requestPermission();await syncPush(enabled)}
+$("consentYes").onclick=async()=>{await saveNotificationChoice(true);$("notificationConsent").close();screen("home")};$("consentNo").onclick=async()=>{await saveNotificationChoice(false);$("notificationConsent").close();screen("home")};
+$("settingsOpen").onclick=()=>{$("settingsDialog").showModal();loadSettings()};$("notificationsOpen").onclick=async()=>{$("notificationDialog").showModal();await loadNotifications();await fetch("/api/notifications/read",{method:"POST"});notificationUnread=0;$("notificationCount").textContent=""};document.querySelectorAll("[data-close]").forEach(button=>button.onclick=()=>$(button.dataset.close).close());
+$("notificationSetting").onchange=async event=>{await saveNotificationChoice(event.target.checked);$("settingsStatus").textContent="Notification preference saved."};$("deleteAccount").onclick=async()=>{if(!confirm("Delete your account and saved data permanently? This cannot be undone."))return;const r=await fetch("/api/account",{method:"DELETE"});if(r.ok)location.reload();else $("settingsStatus").textContent="Account could not be deleted. Please try again."};
 
 function appendLinks(parent,text){
   const pattern=/(https?:\/\/|www\.)[^\s<>]+/gi;let cursor=0;
@@ -353,12 +367,12 @@ $("joinc").onclick=()=>joinGame($("code").value.trim().toUpperCase(),true);
 function connect(){
   ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
   ws.onclose=e=>{if(e.code===4001){location.reload();return}setTimeout(()=>me&&connect(),1500)};
-  ws.onmessage=e=>{const m=JSON.parse(e.data);({lobby,game,msg,history,result,err,kicked,joinRequest,playerJoined,requestSent,joinedGame})[m.t]?.(m)};
+  ws.onmessage=e=>{const m=JSON.parse(e.data);({lobby,game,msg,history,result,err,kicked,joinRequest,playerJoined,requestSent,joinedGame,notification})[m.t]?.(m)};
 }
 function lobby(m){
   const o=$("open");o.innerHTML="";if(!m.list.length)o.textContent="None right now.";
   m.list.forEach(g=>{const r=mk(o,"div");r.className="row";const details=g.mode==="quiz"?`${g.questionCount} questions`:`${g.mins} min`;mk(r,"span",`${g.host} is starting "${g.title}" (${details}, ${g.n} in) · ID ${g.id}`).style.flex="1";const b=mk(r,"button","Request to join");b.className="btn alt";b.onclick=()=>joinGame(g.id,false,g.mode)});
-  const bd=$("board");bd.innerHTML="";if(!m.board.length)bd.textContent="No wins yet.";m.board.forEach((u,i)=>mk(bd,"div",`${i+1}. ${u.name} (ID ${u.pub}) — ${u.wins} wins`));
+  const bd=$("board");bd.replaceChildren();if(!m.board.length)bd.textContent="No games scored yet.";m.board.forEach((u,i)=>{const card=mk(bd,"div");card.className="top-player";mk(card,"div",["🥇","🥈","🥉"][i]||`${i+1}.`).className="top-rank";mk(card,"span",u.name).className="top-name";mk(card,"div",`ID ${u.pub}`);mk(card,"b",`${u.average.toFixed(1)}% average`);mk(card,"div",`Across ${u.games} game${u.games===1?"":"s"}`).className="small"});
 }
 function err(m){
   if(!$("play").classList.contains("hide")&&G?.mode==="quiz")actionError("quizStatus",m.e);

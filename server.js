@@ -46,6 +46,7 @@ await mclient.connect();
 const mdb = mclient.db(process.env.MONGODB_DB || 'karan_game');
 const Users = mdb.collection('users'), Sessions = mdb.collection('sessions'), Results = mdb.collection('results'), Counters = mdb.collection('counters');
 const FanChat = mdb.collection('fan_chat'), FanChatBlocks = mdb.collection('fan_chat_blocks'), AdminSessions = mdb.collection('admin_sessions');
+const Notifications = mdb.collection('notifications'), PushSubscriptions = mdb.collection('push_subscriptions');
 await Users.createIndex({ nameLower: 1 }, { unique: true });
 await Users.createIndex({ pub: 1 }, { unique: true });
 await Users.createIndex({ wins: -1 });
@@ -55,6 +56,10 @@ await FanChat.createIndex({ createdAt: -1 });
 await FanChat.createIndex({ uid: 1, createdAt: -1 });
 await FanChatBlocks.createIndex({ uid: 1 }, { unique: true });
 await AdminSessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 });
+await Notifications.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+await Notifications.createIndex({ uid: 1, createdAt: -1 });
+await PushSubscriptions.createIndex({ uid: 1, endpoint: 1 }, { unique: true });
+await Results.createIndex({ uid: 1, ts: -1 });
 console.log('MongoDB connected');
 const nextId = async () => (await Counters.findOneAndUpdate({ _id: 'users' }, { $inc: { n: 1 } }, { upsert: true, returnDocument: 'after' })).n;
 const hash = (pw, salt) => crypto.scryptSync(pw, salt, 64).toString('hex');
@@ -83,9 +88,10 @@ app.post('/api/register', async (req, res) => {
     if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     const salt = crypto.randomBytes(16).toString('hex'), id = await nextId();
     const createdAt = new Date();
-    try { await Users.insertOne({ _id: id, name: nm, nameLower: nm.toLowerCase(), pub: await newPub(), salt, hash: hash(String(password), salt), wins: 0, played: 0, createdAt }); }
+    try { await Users.insertOne({ _id: id, name: nm, nameLower: nm.toLowerCase(), pub: await newPub(), salt, hash: hash(String(password), salt), wins: 0, played: 0, notifications: false, createdAt }); }
     catch (e) { if (e.code === 11000) return res.status(400).json({ error: 'That name is already taken.' }); throw e; }
     await FanChat.insertOne({ kind: 'system', body: `${nm} joined the fan community! Welcome 🎉`, createdAt, reactions: {} });
+    for (const member of await Users.find({ _id: { $ne: id }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'New fan joined', `${nm} joined the community.`);
     setCookie(req, res, await newSession(id));
     res.json(pubUser(await userById(id)));
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error. Please try again.' }); }
@@ -101,6 +107,62 @@ app.post('/api/login', async (req, res) => {
 });
 app.post('/api/logout', async (req, res) => { try { await Sessions.deleteOne({ token: cookie(req, 'sid') || '' }); } catch (e) { console.error(e); } res.json({ ok: 1 }); });
 app.get('/api/me', async (req, res) => { try { const u = await userBySid(cookie(req, 'sid')); u ? res.json(pubUser(u)) : res.status(401).json({}); } catch (e) { res.status(500).json({}); } });
+const accountUser = async (req, res, next) => { try { const u = await userBySid(cookie(req, 'sid')); if (!u) return res.status(401).json({ error: 'Sign in first.' }); req.accountUser = u; next(); } catch { res.status(500).json({ error: 'Could not verify your account.' }); } };
+async function notify(uid, title, body, tag = 'community') {
+  try {
+  const recipient = await Users.findOne({ _id: uid }, { projection: { notifications: 1 } });
+  if (!recipient || recipient.notifications === false) return;
+  const createdAt = new Date();
+  await Notifications.insertOne({ uid, title, body, tag, createdAt, expiresAt: new Date(createdAt.getTime() + 86400000), read: false });
+  sendUser(uid, { t: 'notification', notification: { title, body, tag, createdAt: createdAt.getTime() } });
+  const connected = [...(online.get(uid) || [])].some(socket => socket.readyState === 1);
+  if (!connected && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT) {
+    try {
+      const webpush = (await import('web-push')).default;
+      webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+      const subs = await PushSubscriptions.find({ uid }).toArray();
+      await Promise.all(subs.map(async sub => { try { await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, tag }), { TTL: 86400 }); } catch (error) { if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ _id: sub._id }); } }));
+    } catch (error) { console.error('Push notification failed:', error.message); }
+  }
+  } catch (error) { console.error('Could not create notification:', error.message); }
+}
+app.get('/api/settings', accountUser, (req, res) => res.json({ notifications: req.accountUser.notifications !== false, pushKey: process.env.VAPID_PUBLIC_KEY || '' }));
+app.patch('/api/settings', accountUser, async (req, res) => { try { const notifications = req.body?.notifications; if (typeof notifications !== 'boolean') return res.status(400).json({ error: 'Choose whether notifications are on or off.' }); await Users.updateOne({ _id: req.accountUser._id }, { $set: { notifications } }); res.json({ notifications }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not save notification settings.' }); } });
+app.get('/api/notifications', accountUser, async (req, res) => { try { const items = await Notifications.find({ uid: req.accountUser._id, expiresAt: { $gt: new Date() } }).sort({ createdAt: -1 }).limit(100).toArray(); res.json({ notifications: items.map(n => ({ id: n._id.toString(), title: n.title, body: n.body, tag: n.tag, createdAt: n.createdAt.getTime(), read: n.read })) }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load notifications.' }); } });
+app.post('/api/notifications/read', accountUser, async (req, res) => { try { await Notifications.updateMany({ uid: req.accountUser._id, read: false }, { $set: { read: true } }); res.json({ ok: true }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not update notifications.' }); } });
+app.post('/api/push-subscription', accountUser, async (req, res) => { try { const s = req.body?.subscription; if (!s?.endpoint || !s?.keys?.p256dh || !s?.keys?.auth) return res.status(400).json({ error: 'Invalid push subscription.' }); await PushSubscriptions.updateOne({ uid: req.accountUser._id, endpoint: s.endpoint }, { $set: { subscription: s } }, { upsert: true }); res.json({ ok: true }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not save push subscription.' }); } });
+app.delete('/api/push-subscription', accountUser, async (req, res) => { try { const endpoint = String(req.body?.endpoint || ''); await PushSubscriptions.deleteOne({ uid: req.accountUser._id, endpoint }); res.json({ ok: true }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not remove push subscription.' }); } });
+function redactDeletedMember(replies, uid) {
+  for (const reply of replies || []) {
+    if (reply.uid === uid) { reply.deleted = true; reply.body = 'This reply was deleted.'; delete reply.uid; }
+    redactDeletedMember(reply.replies, uid);
+  }
+}
+app.delete('/api/account', accountUser, async (req, res) => {
+  const uid = req.accountUser._id;
+  try {
+    const posts = await FanChat.find({ uid }).toArray();
+    const replies = await FanChat.find({ 'replies.uid': uid }).toArray();
+    await Promise.allSettled(posts.flatMap(post => (post.media || []).map(file => cloudinary.uploader.destroy(file.publicId, { resource_type: file.resourceType, invalidate: true }))));
+    for (const post of replies) { redactDeletedMember(post.replies, uid); await FanChat.updateOne({ _id: post._id }, { $set: { replies: post.replies } }); }
+    await Promise.all([Sessions.deleteMany({ uid }), Results.deleteMany({ uid }), Notifications.deleteMany({ uid }), PushSubscriptions.deleteMany({ uid }), FanChat.deleteMany({ uid }), FanChatBlocks.deleteMany({ uid }), Users.deleteOne({ _id: uid })]);
+    online.get(uid)?.forEach(socket => socket.close(4001));
+    res.setHeader('Set-Cookie', 'sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0'); res.json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete your account. Please try again.' }); }
+});
+async function clearHostNotifications(gameId) {
+  const tag = `host-${gameId}`;
+  const entries = await Notifications.find({ tag }).project({ uid: 1 }).toArray();
+  await Notifications.deleteMany({ tag });
+  if (!entries.length || !process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY || !process.env.VAPID_SUBJECT) return;
+  try {
+    const webpush = (await import('web-push')).default;
+    webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+    const uids = [...new Set(entries.map(entry => entry.uid))];
+    const subs = await PushSubscriptions.find({ uid: { $in: uids } }).toArray();
+    await Promise.all(subs.map(sub => webpush.sendNotification(sub.subscription, JSON.stringify({ cancel: tag }), { TTL: 86400 }).catch(() => {})));
+  } catch (error) { console.error('Could not clear game host push notifications:', error.message); }
+}
 
 // ---------- public fan chat ----------
 const mediaExtensions = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif', 'image/avif': '.avif', 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'video/ogg': '.ogv' };
@@ -180,6 +242,7 @@ app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
         mime: file.mimetype,
       })),
     });
+    for (const member of await Users.find({ _id: { $ne: req.user._id }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'New fan chat message', `${req.user.name} sent a message in the fan chat.`);
     res.status(201).json({ ok: true });
   } catch (error) {
     try {
@@ -458,7 +521,11 @@ function gamePayload(g, viewerUid) {
 }
 const pushState = g => g.players.forEach((_, uid) => sendUser(uid, { t: 'game', g: gamePayload(g, uid) }));
 async function leaderboard() {
-  return Users.find({ wins: { $gt: 0 } }).sort({ wins: -1, name: 1 }).limit(3).project({ _id: 0, name: 1, pub: 1, wins: 1 }).toArray();
+  const rows = await Results.aggregate([{ $group: { _id: '$uid', average: { $avg: '$pct' }, games: { $sum: 1 } } }, { $sort: { average: -1, games: -1, _id: 1 } }, { $limit: 3 }]).toArray();
+  if (!rows.length) return [];
+  const users = await Users.find({ _id: { $in: rows.map(row => row._id) } }).project({ name: 1, pub: 1 }).toArray();
+  const byId = new Map(users.map(user => [user._id, user]));
+  return rows.flatMap((row, index) => { const user = byId.get(row._id); return user ? [{ name: user.name, pub: user.pub, average: row.average, games: row.games, rank: index + 1 }] : []; });
 }
 async function pushLobby() {
   const list = [...games.values()].filter(g => g.status === 'lobby' && !g.solo).map(g => ({
@@ -545,14 +612,21 @@ async function endGame(g) {
   let top = null;
   for (const [uid, p, r] of res) if (r.pct != null && (!top || r.pct > top.pct)) top = { name: p.name, id: (await userById(uid))?.pub || '', pct: r.pct, uid };
   try { if (top && ps.length > 1) await Users.updateOne({ _id: top.uid }, { $inc: { wins: 1 } }); } catch (e) { console.error(e); }
+  const oldTop = new Set((await leaderboard().catch(() => [])).map(player => player.pub));
   for (const [uid, , r] of res) {
     try {
+      if (!(await userById(uid))) continue;
       await Users.updateOne({ _id: uid }, { $inc: { played: 1 } });
-      if (r.pct != null) await Results.insertOne({ game: g.id, uid, pct: r.pct, detail: r, ts: new Date() });
+      if (r.pct != null) await Results.insertOne({ game: g.id, uid, mode: g.mode, pct: r.pct, detail: r, ts: new Date() });
     } catch (e) { console.error(e); }
     // everyone sees ONLY the top player; each player sees only their own full result
     const msg = { t: 'result', mine: r, top: top ? { name: top.name, id: top.id, pct: top.pct } : null };
     g.results.set(uid, msg); sendUser(uid, msg);
+  }
+  const newTop = await leaderboard().catch(() => []);
+  for (const player of newTop) if (!oldTop.has(player.pub)) {
+    const user = await Users.findOne({ pub: player.pub });
+    if (user) await notify(user._id, 'You are in the top three!', `Your average score is ${player.average.toFixed(1)}% across ${player.games} game${player.games === 1 ? '' : 's'}.`, 'top-player');
   }
   g.status = 'done'; pushState(g); pushLobby();
   setTimeout(() => games.delete(g.id), 30 * 60000);
@@ -600,6 +674,7 @@ wss.on('connection', (ws, req) => {
           title: mode === 'serial' ? show : MODES[mode], players: new Map([[uid, player]]), msgs: [], results: new Map(),
         };
         games.set(id, g);
+        if (!g.solo) for (const member of await Users.find({ _id: { $ne: uid }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'A game is starting', `${me.name} started ${g.title}. Game ID: ${id}.`, `host-${id}`);
         if (g.solo) startGame(g); else { pushState(g); pushLobby(); }
       } else if (m.t === 'join') {
         const g = games.get(m.gid); if (!g || g.status !== 'lobby') return err('Game not found, or it has already started.');
@@ -670,6 +745,7 @@ wss.on('connection', (ws, req) => {
   });
 });
 function startGame(g) {
+  clearHostNotifications(g.id).catch(error => console.error(error));
   [...g.players].forEach(([id, p]) => { if (p.status !== 'joined') { g.players.delete(id); sendUser(id, { t: 'kicked' }); } });
   g.status = 'live';
   if (g.mode === 'quiz') {
@@ -693,28 +769,21 @@ function scheduleQuizQuestionTimeout(g) {
     pushState(g);
   }, 25_000);
   clearTimeout(quiz.advanceTimer);
-  quiz.advanceTimer = setTimeout(async () => {
-    if (g.status !== 'live' || g.quiz !== quiz) return;
-    if (!quiz.revealed) {
-      revealQuizQuestion(quiz, joined(g));
-      pushState(g);
-    }
-    if (quiz.index + 1 >= quiz.questions.length) {
-      await endGame(g);
-      return;
-    }
-    quiz.index += 1;
-    quiz.currentAnswers.clear();
-    quiz.revealed = false;
-    quiz.questionEndsAt = null;
-    quiz.advanceAt = null;
-    scheduleQuizQuestionTimeout(g);
-    pushState(g);
-  }, 30_000);
+  quiz.advanceTimer = setTimeout(() => advanceQuizQuestion(g, quiz), 30_000);
+}
+async function advanceQuizQuestion(g, quiz) {
+  if (g.status !== 'live' || g.quiz !== quiz) return;
+  if (!quiz.revealed) { revealQuizQuestion(quiz, joined(g)); pushState(g); }
+  if (quiz.index + 1 >= quiz.questions.length) return endGame(g);
+  quiz.index += 1; quiz.currentAnswers.clear(); quiz.revealed = false; quiz.questionEndsAt = null; quiz.advanceAt = null;
+  scheduleQuizQuestionTimeout(g); pushState(g);
 }
 function revealAndScheduleQuizAdvance(g) {
   const quiz = g.quiz;
   if (!quiz || !revealQuizQuestion(quiz, joined(g))) return;
   clearTimeout(quiz.questionTimer);
+  clearTimeout(quiz.advanceTimer);
+  quiz.advanceAt = Date.now() + 2000;
+  quiz.advanceTimer = setTimeout(() => advanceQuizQuestion(g, quiz), 2000);
 }
 server.listen(PORT, () => console.log('Running on http://localhost:' + PORT));
