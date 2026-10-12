@@ -246,17 +246,6 @@ async function deleteReply(req, res, replyId) {
   await FanChat.updateOne({ _id: post._id }, { $set: { replies: post.replies } });
   res.json({ ok: true });
 }
-app.delete('/api/admin/messages/:id/replies/:replyId', requireAdmin, async (req, res) => {
-  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
-  try {
-    const post = await FanChat.findOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true } });
-    const reply = post && findReply(post.replies || [], req.params.replyId);
-    if (!reply || reply.deleted) return res.status(404).json({ error: 'Reply not found.' });
-    reply.deleted = true; reply.body = 'This reply was deleted.'; delete reply.uid;
-    await FanChat.updateOne({ _id: post._id }, { $set: { replies: post.replies } });
-    res.json({ ok: true });
-  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete reply.' }); }
-});
 app.delete('/api/fan-chat/:id/replies/:replyId', signedIn, async (req, res) => {
   if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
   try { await deleteReply(req, res, req.params.replyId); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete reply.' }); }
@@ -357,6 +346,17 @@ app.delete('/api/admin/messages/:id', requireAdmin, async (req, res) => {
     if (!post) return res.status(404).json({ error: 'Message not found.' });
     await deleteFanMessage(post, {}, res);
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete this message.' }); }
+});
+app.delete('/api/admin/messages/:id/replies/:replyId', requireAdmin, async (req, res) => {
+  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
+  try {
+    const post = await FanChat.findOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true } });
+    const reply = post && findReply(post.replies || [], req.params.replyId);
+    if (!reply || reply.deleted) return res.status(404).json({ error: 'Reply not found.' });
+    reply.deleted = true; reply.body = 'This reply was deleted.'; delete reply.uid;
+    await FanChat.updateOne({ _id: post._id }, { $set: { replies: post.replies } });
+    res.json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete reply.' }); }
 });
 app.post('/api/admin/blocks/:uid', requireAdmin, async (req, res) => {
   const uid = Number(req.params.uid);
