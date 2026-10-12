@@ -1,0 +1,12 @@
+{
+  "name": "Karan Patel Fans Community",
+  "short_name": "KP Fans",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f2",
+  "theme_color": "#145b62",
+  "icons": [
+    { "src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
