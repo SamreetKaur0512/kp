@@ -6,7 +6,7 @@ self.addEventListener('push', event => {
     return;
   }
   event.waitUntil(self.registration.showNotification(data.title || 'Karan Patel Fan Club', {
-    body: data.body || '', tag: data.tag || 'community', icon: '/icon.png', badge: '/icon.png',
+    body: data.body || '', tag: data.tag || 'community', icon: '/logo.png', badge: '/logo.png',
   }));
 });
 self.addEventListener('notificationclick', event => {
