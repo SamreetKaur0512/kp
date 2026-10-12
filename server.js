@@ -115,13 +115,14 @@ async function notify(uid, title, body, tag = 'community', actorUid = null) {
   const createdAt = new Date();
   await Notifications.insertOne({ uid, title, body, tag, actorUid, actorName: actorUid == null ? null : (await Users.findOne({ _id: actorUid }, { projection: { name: 1 } }))?.name || null, createdAt, expiresAt: new Date(createdAt.getTime() + 86400000), read: false });
   sendUser(uid, { t: 'notification', notification: { title, body, tag, createdAt: createdAt.getTime() } });
-  const connected = [...(online.get(uid) || [])].some(socket => socket.readyState === 1);
-  if (!connected && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT) {
+  // Push is per device. A live session on one browser must not suppress push
+  // delivery to the user's other subscribed browsers/devices.
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT) {
     try {
       const webpush = (await import('web-push')).default;
       webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
       const subs = await PushSubscriptions.find({ uid }).toArray();
-      await Promise.all(subs.map(async sub => { try { await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, tag }), { TTL: 86400, urgency: 'high' }); } catch (error) { if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ _id: sub._id }); } }));
+      await Promise.all(subs.map(async sub => { try { await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, tag }), { TTL: 86400, urgency: 'high' }); } catch (error) { console.error('Push delivery failed:', error.statusCode || 'error', error.message); if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ _id: sub._id }); } }));
     } catch (error) { console.error('Push notification failed:', error.message); }
   }
   } catch (error) { console.error('Could not create notification:', error.message); }
