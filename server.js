@@ -7,7 +7,6 @@ import { createCloudinaryStorage } from './cloudinary-storage.js';
 import { ACTING_CRITERIA, actingJudgePrompt } from './acting-judge.js';
 import { buildQuiz, QUIZ_QUESTION_COUNTS, quizPlayerResult, revealQuizQuestion, submitQuizAnswer } from './quiz-game.js';
 import { removeHumanCharacterLines, roleplaySystemPrompt, roleplayTurnPrompt } from './roleplay.js';
-import { fanChatHistoryFilter } from './fan-chat-history.js';
 import crypto from 'crypto';
 import http from 'http';
 import path from 'path';
@@ -83,8 +82,10 @@ app.post('/api/register', async (req, res) => {
     if (!/^[\p{L}\p{N} _.-]{2,20}$/u.test(nm)) return res.status(400).json({ error: 'Name must be 2-20 letters/numbers.' });
     if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     const salt = crypto.randomBytes(16).toString('hex'), id = await nextId();
-    try { await Users.insertOne({ _id: id, name: nm, nameLower: nm.toLowerCase(), pub: await newPub(), salt, hash: hash(String(password), salt), wins: 0, played: 0, createdAt: new Date() }); }
+    const createdAt = new Date();
+    try { await Users.insertOne({ _id: id, name: nm, nameLower: nm.toLowerCase(), pub: await newPub(), salt, hash: hash(String(password), salt), wins: 0, played: 0, createdAt }); }
     catch (e) { if (e.code === 11000) return res.status(400).json({ error: 'That name is already taken.' }); throw e; }
+    await FanChat.insertOne({ kind: 'system', body: `${nm} joined the fan community! Welcome 🎉`, createdAt, reactions: {} });
     setCookie(req, res, await newSession(id));
     res.json(pubUser(await userById(id)));
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error. Please try again.' }); }
@@ -130,22 +131,34 @@ const signedIn = async (req, res, next) => {
 app.get('/api/fan-chat', async (req, res) => {
   try {
     const viewer = await userBySid(cookie(req, 'sid') || '');
-    const posts = await FanChat.find(fanChatHistoryFilter(viewer)).sort({ createdAt: -1, _id: -1 }).limit(100).toArray();
-    const userIds = [...new Set(posts.filter(post => !post.deleted && post.uid != null).map(post => post.uid))];
+    const posts = await FanChat.find({}).sort({ createdAt: -1, _id: -1 }).limit(100).toArray();
+    const userIds = [...new Set(posts.flatMap(post => [post.uid, ...collectReplyUserIds(post.replies || []), ...Object.values(post.reactions || {}).flatMap(users => users || [])]).filter(id => id != null))];
     const users = await Users.find({ _id: { $in: userIds } }).project({ name: 1 }).toArray();
     const names = new Map(users.map(user => [user._id, user.name]));
     const messages = posts.reverse().flatMap(post => {
-      if (post.deleted) return [{ id: post._id.toString(), deleted: true, body: post.body, created_at: post.createdAt.getTime(), media: [] }];
+      if (post.kind === 'system') return [{ id: post._id.toString(), system: true, body: post.body, created_at: post.createdAt.getTime(), reactions: reactionSummary(post.reactions, names, viewer) }];
+      if (post.deleted) return [{ id: post._id.toString(), deleted: true, body: post.body, created_at: post.createdAt.getTime(), media: [], reactions: [], replies: [] }];
       if (!names.has(post.uid)) return [];
       return [{
         id: post._id.toString(), uid: post.uid, isMine: viewer?._id === post.uid, name: names.get(post.uid), body: post.body, created_at: post.createdAt.getTime(),
         media: (post.media || []).map(file => ({ id: file.id, url: file.url, name: file.name, mime: file.mime })),
+        reactions: reactionSummary(post.reactions, names, viewer),
+        replies: (post.replies || []).map(reply => serializeReply(reply, names, viewer)),
       }];
     });
     const members = onlineCount();
     res.json({ messages, members });
   } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load the fan chat.' }); }
 });
+function reactionSummary(reactions = {}, names, viewer) {
+  return Object.entries(reactions).map(([emoji, uids]) => ({ emoji, count: uids.length, mine: uids.includes(viewer?._id), names: uids.map(uid => names.get(uid)).filter(Boolean) }));
+}
+function collectReplyUserIds(replies) { return replies.flatMap(reply => [reply.uid, ...Object.values(reply.reactions || {}).flatMap(users => users || []), ...collectReplyUserIds(reply.replies || [])]); }
+function serializeReply(reply, names, viewer) {
+  return { id: reply.id, uid: reply.uid, name: names.get(reply.uid) || 'Member', body: reply.body, created_at: reply.createdAt.getTime(), isMine: viewer?._id === reply.uid, deleted: Boolean(reply.deleted), reactions: reactionSummary(reply.reactions, names, viewer), replies: (reply.replies || []).map(child => serializeReply(child, names, viewer)) };
+}
+function findReply(replies, id) { for (const reply of replies) { if (reply.id === id) return reply; const nested = findReply(reply.replies || [], id); if (nested) return nested; } return null; }
+function appendChildReply(replies, parentId, child) { for (const reply of replies) { if (reply.id === parentId) { reply.replies ||= []; reply.replies.push(child); return true; } if (appendChildReply(reply.replies || [], parentId, child)) return true; } return false; }
 app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
   const body = String(req.body?.body || '').trim().slice(0, 4000);
   const files = req.files || [];
@@ -157,7 +170,7 @@ app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
       return res.status(429).json({ error: 'Please wait a moment before posting again.' });
     }
     await FanChat.insertOne({
-      uid: req.user._id, body, createdAt: new Date(),
+      uid: req.user._id, body, createdAt: new Date(), reactions: {}, replies: [],
       media: files.map(file => ({
         id: crypto.randomBytes(12).toString('hex'),
         publicId: file.filename,
@@ -175,6 +188,93 @@ app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
     console.error(error);
     res.status(500).json({ error: 'Message could not be sent.' });
   }
+});
+const allowedReactions = new Set(['👍', '❤️', '😂', '😮', '😢', '👏', '🔥']);
+async function updateReaction(req, res, target) {
+  const emoji = String(req.body?.emoji || '');
+  if (!allowedReactions.has(emoji)) return res.status(400).json({ error: 'Choose an available emoji.' });
+  const post = await FanChat.findOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true } });
+  const reply = target === 'reply' && post ? findReply(post.replies || [], req.params.replyId) : null;
+  if (!post || (target === 'reply' && (!reply || reply.deleted))) return res.status(404).json({ error: 'Message not found.' });
+  const bucket = target === 'reply' ? (reply.reactions ||= {}) : (post.reactions ||= {});
+  const current = bucket[emoji] || [], updated = current.includes(req.user._id) ? current.filter(uid => uid !== req.user._id) : [...current, req.user._id];
+  if (updated.length) bucket[emoji] = updated; else delete bucket[emoji];
+  await FanChat.updateOne({ _id: post._id }, { $set: target === 'reply' ? { replies: post.replies } : { reactions: post.reactions } });
+  res.json({ ok: true });
+}
+for (const target of ['message', 'reply']) {
+  const suffix = target === 'reply' ? '/replies/:replyId/reactions' : '/reactions';
+  app.post(`/api/fan-chat/:id${suffix}`, signedIn, async (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
+    try { await updateReaction(req, res, target); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not update reaction.' }); }
+  });
+}
+app.post('/api/fan-chat/:id/replies', signedIn, async (req, res) => {
+  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
+  const body = String(req.body?.body || '').trim().slice(0, 2000);
+  if (!body) return res.status(400).json({ error: 'Write a reply first.' });
+  try {
+    const reply = { id: crypto.randomBytes(12).toString('hex'), uid: req.user._id, body, createdAt: new Date(), reactions: {}, replies: [] };
+    const post = await FanChat.findOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true }, kind: { $ne: 'system' } });
+    if (!post) return res.status(404).json({ error: 'Message not found.' });
+    post.replies ||= []; post.replies.push(reply);
+    const result = await FanChat.updateOne({ _id: post._id }, { $set: { replies: post.replies } });
+    if (!result.modifiedCount) return res.status(404).json({ error: 'Message not found.' });
+    res.status(201).json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not send reply.' }); }
+});
+app.post('/api/fan-chat/:id/replies/:replyId/replies', signedIn, async (req, res) => {
+  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
+  const body = String(req.body?.body || '').trim().slice(0, 2000);
+  if (!body) return res.status(400).json({ error: 'Write a reply first.' });
+  try {
+    const reply = { id: crypto.randomBytes(12).toString('hex'), uid: req.user._id, body, createdAt: new Date(), reactions: {}, replies: [] };
+    const postId = new ObjectId(req.params.id), post = await FanChat.findOne({ _id: postId, deleted: { $ne: true } });
+    const parent = post && findReply(post.replies || [], req.params.replyId);
+    if (!parent || parent.deleted) return res.status(404).json({ error: 'Reply not found.' });
+    parent.replies ||= []; parent.replies.push(reply);
+    const result = await FanChat.updateOne({ _id: postId }, { $set: { replies: post.replies } });
+    if (!result.modifiedCount) return res.status(404).json({ error: 'Reply not found.' });
+    res.status(201).json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not send reply.' }); }
+});
+async function deleteReply(req, res, replyId) {
+  const post = await FanChat.findOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true } });
+  const reply = post && findReply(post.replies || [], replyId);
+  if (!reply || reply.uid !== req.user._id || reply.deleted) return res.status(404).json({ error: 'Reply not found or it is not yours.' });
+  reply.deleted = true; reply.body = 'This reply was deleted.'; delete reply.uid;
+  await FanChat.updateOne({ _id: post._id }, { $set: { replies: post.replies } });
+  res.json({ ok: true });
+}
+app.delete('/api/admin/messages/:id/replies/:replyId', requireAdmin, async (req, res) => {
+  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
+  try {
+    const post = await FanChat.findOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true } });
+    const reply = post && findReply(post.replies || [], req.params.replyId);
+    if (!reply || reply.deleted) return res.status(404).json({ error: 'Reply not found.' });
+    reply.deleted = true; reply.body = 'This reply was deleted.'; delete reply.uid;
+    await FanChat.updateOne({ _id: post._id }, { $set: { replies: post.replies } });
+    res.json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete reply.' }); }
+});
+app.delete('/api/fan-chat/:id/replies/:replyId', signedIn, async (req, res) => {
+  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
+  try { await deleteReply(req, res, req.params.replyId); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not delete reply.' }); }
+});
+app.post('/api/fan-chat/:id/replies/:replyId/replies/:childId/replies', signedIn, async (req, res) => {
+  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
+  const body = String(req.body?.body || '').trim().slice(0, 2000);
+  if (!body) return res.status(400).json({ error: 'Write a reply first.' });
+  try {
+    const postId = new ObjectId(req.params.id), reply = { id: crypto.randomBytes(12).toString('hex'), uid: req.user._id, body, createdAt: new Date(), reactions: {}, replies: [] };
+    const post = await FanChat.findOne({ _id: postId, deleted: { $ne: true } });
+    if (!post) return res.status(404).json({ error: 'Message not found.' });
+    const parent = findReply(post.replies || [], req.params.childId);
+    if (!parent || parent.deleted) return res.status(404).json({ error: 'Reply not found.' });
+    parent.replies ||= []; parent.replies.push(reply);
+    await FanChat.updateOne({ _id: postId }, { $set: { replies: post.replies } });
+    res.status(201).json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not send reply.' }); }
 });
 async function deleteFanMessage(post, query, res) {
   const result = await FanChat.updateOne(
