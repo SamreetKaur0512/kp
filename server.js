@@ -111,7 +111,7 @@ const accountUser = async (req, res, next) => { try { const u = await userBySid(
 async function notify(uid, title, body, tag = 'community') {
   try {
   const recipient = await Users.findOne({ _id: uid }, { projection: { notifications: 1 } });
-  if (!recipient || recipient.notifications === false) return;
+  if (!recipient || recipient.notifications !== true) return;
   const createdAt = new Date();
   await Notifications.insertOne({ uid, title, body, tag, createdAt, expiresAt: new Date(createdAt.getTime() + 86400000), read: false });
   sendUser(uid, { t: 'notification', notification: { title, body, tag, createdAt: createdAt.getTime() } });
@@ -126,7 +126,7 @@ async function notify(uid, title, body, tag = 'community') {
   }
   } catch (error) { console.error('Could not create notification:', error.message); }
 }
-app.get('/api/settings', accountUser, (req, res) => res.json({ notifications: req.accountUser.notifications !== false, pushKey: process.env.VAPID_PUBLIC_KEY || '' }));
+app.get('/api/settings', accountUser, (req, res) => res.json({ notifications: req.accountUser.notifications === true, pushKey: process.env.VAPID_PUBLIC_KEY || '' }));
 app.patch('/api/settings', accountUser, async (req, res) => { try { const notifications = req.body?.notifications; if (typeof notifications !== 'boolean') return res.status(400).json({ error: 'Choose whether notifications are on or off.' }); await Users.updateOne({ _id: req.accountUser._id }, { $set: { notifications } }); res.json({ notifications }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not save notification settings.' }); } });
 app.get('/api/notifications', accountUser, async (req, res) => { try { const items = await Notifications.find({ uid: req.accountUser._id, expiresAt: { $gt: new Date() } }).sort({ createdAt: -1 }).limit(100).toArray(); res.json({ notifications: items.map(n => ({ id: n._id.toString(), title: n.title, body: n.body, tag: n.tag, createdAt: n.createdAt.getTime(), read: n.read })) }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not load notifications.' }); } });
 app.post('/api/notifications/read', accountUser, async (req, res) => { try { await Notifications.updateMany({ uid: req.accountUser._id, read: false }, { $set: { read: true } }); res.json({ ok: true }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not update notifications.' }); } });
