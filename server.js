@@ -122,7 +122,7 @@ async function notify(uid, title, body, tag = 'community', actorUid = null) {
       const webpush = (await import('web-push')).default;
       webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
       const subs = await PushSubscriptions.find({ uid }).toArray();
-      await Promise.all(subs.map(async sub => { try { await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, tag }), { TTL: 86400, urgency: 'high' }); } catch (error) { console.error('Push delivery failed:', error.statusCode || 'error', error.message); if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ _id: sub._id }); } }));
+      await Promise.all(subs.map(async sub => { try { await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, tag }), { TTL: 86400, urgency: 'normal' }); } catch (error) { console.error('Push delivery failed:', error.statusCode || 'error', error.message); if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ _id: sub._id }); } }));
     } catch (error) { console.error('Push notification failed:', error.message); }
   }
   } catch (error) { console.error('Could not create notification:', error.message); }
@@ -138,7 +138,7 @@ async function notifyChatReaction(uid, title, body, tag, actorUid) {
       const webpush = (await import('web-push')).default;
       webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
       const subs = await PushSubscriptions.find({ uid }).toArray();
-      await Promise.all(subs.map(async sub => { try { await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, tag }), { TTL: 86400, urgency: 'high' }); } catch (error) { if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ _id: sub._id }); else console.error('Push delivery failed:', error.statusCode || 'error', error.message); } }));
+      await Promise.all(subs.map(async sub => { try { await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, tag }), { TTL: 86400, urgency: 'normal' }); } catch (error) { if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ _id: sub._id }); else console.error('Push delivery failed:', error.statusCode || 'error', error.message); } }));
     }
   } catch (error) { console.error('Could not create chat reaction notification:', error.message); }
 }
@@ -315,7 +315,6 @@ app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
         mime: file.mimetype,
       })),
     });
-    for (const member of await Users.find({ _id: { $ne: req.user._id }, notifications: { $ne: false } }).project({ _id: 1 }).toArray()) await notify(member._id, 'New fan chat message', `${req.user.name} sent a message in the fan chat.`, 'community', req.user._id);
     res.status(201).json({ ok: true });
   } catch (error) {
     try {
