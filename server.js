@@ -127,6 +127,21 @@ async function notify(uid, title, body, tag = 'community', actorUid = null) {
   }
   } catch (error) { console.error('Could not create notification:', error.message); }
 }
+async function notifyChatReaction(uid, title, body, tag, actorUid) {
+  try {
+    const createdAt = new Date();
+    const actor = await Users.findOne({ _id: actorUid }, { projection: { name: 1 } });
+    await Notifications.insertOne({ uid, title, body, tag, actorUid, actorName: actor?.name || null, createdAt, expiresAt: new Date(createdAt.getTime() + 86400000), read: false });
+    sendUser(uid, { t: 'notification', notification: { title, body, tag, createdAt: createdAt.getTime() } });
+    const recipient = await Users.findOne({ _id: uid }, { projection: { notifications: 1 } });
+    if (recipient?.notifications === true && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT) {
+      const webpush = (await import('web-push')).default;
+      webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+      const subs = await PushSubscriptions.find({ uid }).toArray();
+      await Promise.all(subs.map(async sub => { try { await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body, tag }), { TTL: 86400, urgency: 'high' }); } catch (error) { if (error.statusCode === 404 || error.statusCode === 410) await PushSubscriptions.deleteOne({ _id: sub._id }); else console.error('Push delivery failed:', error.statusCode || 'error', error.message); } }));
+    }
+  } catch (error) { console.error('Could not create chat reaction notification:', error.message); }
+}
 app.get('/api/settings', accountUser, (req, res) => res.json({ notifications: req.accountUser.notifications === true, pushKey: process.env.VAPID_PUBLIC_KEY || '' }));
 app.patch('/api/settings', accountUser, async (req, res) => { try { const notifications = req.body?.notifications; if (typeof notifications !== 'boolean') return res.status(400).json({ error: 'Choose whether notifications are on or off.' }); await Users.updateOne({ _id: req.accountUser._id }, { $set: { notifications } }); res.json({ notifications }); } catch (error) { console.error(error); res.status(500).json({ error: 'Could not save notification settings.' }); } });
 app.patch('/api/account/name', accountUser, async (req, res) => {
@@ -235,7 +250,7 @@ app.get('/api/fan-chat', async (req, res) => {
   try {
     const viewer = await userBySid(cookie(req, 'sid') || '');
     const posts = await FanChat.find({}).sort({ createdAt: -1, _id: -1 }).limit(100).toArray();
-    const userIds = [...new Set(posts.flatMap(post => [post.uid, post.joinUid, ...collectReplyUserIds(post.replies || []), ...Object.values(post.reactions || {}).flatMap(users => users || [])]).filter(id => id != null))];
+    const userIds = [...new Set(posts.flatMap(post => [post.uid, post.joinUid, ...collectReplyUserIds(post.replies || []), ...Object.values(post.reactions || {}).flatMap(users => users || []), ...(post.seenBy || []), ...collectReplySeenIds(post.replies || [])]).filter(id => id != null))];
     const users = await Users.find({ _id: { $in: userIds } }).project({ name: 1 }).toArray();
     const names = new Map(users.map(user => [user._id, user.name]));
     const messages = posts.reverse().flatMap(post => {
@@ -246,6 +261,7 @@ app.get('/api/fan-chat', async (req, res) => {
         id: post._id.toString(), uid: post.uid, isMine: viewer?._id === post.uid, name: names.get(post.uid), body: post.body, created_at: post.createdAt.getTime(),
         media: (post.media || []).map(file => ({ id: file.id, url: file.url, name: file.name, mime: file.mime })),
         reactions: reactionSummary(post.reactions, names, viewer),
+        seenBy: serializeSeen(post.seenBy, names),
         replies: (post.replies || []).map(reply => serializeReply(reply, names, viewer)),
       }];
     });
@@ -257,9 +273,24 @@ function reactionSummary(reactions = {}, names, viewer) {
   return Object.entries(reactions).map(([emoji, uids]) => ({ emoji, count: uids.length, mine: uids.includes(viewer?._id), names: uids.map(uid => names.get(uid)).filter(Boolean) }));
 }
 function collectReplyUserIds(replies) { return replies.flatMap(reply => [reply.uid, ...Object.values(reply.reactions || {}).flatMap(users => users || []), ...collectReplyUserIds(reply.replies || [])]); }
+function collectReplySeenIds(replies) { return replies.flatMap(reply => [...(reply.seenBy || []), ...collectReplySeenIds(reply.replies || [])]); }
+function serializeSeen(ids = [], names) { return ids.map(uid => ({ id: String(uid), name: names.get(uid) || 'Member' })); }
 function serializeReply(reply, names, viewer) {
-  return { id: reply.id, uid: reply.uid, name: names.get(reply.uid) || 'Member', body: reply.body, created_at: reply.createdAt.getTime(), isMine: viewer?._id === reply.uid, deleted: Boolean(reply.deleted), reactions: reactionSummary(reply.reactions, names, viewer), replies: (reply.replies || []).map(child => serializeReply(child, names, viewer)) };
+  return { id: reply.id, uid: reply.uid, name: names.get(reply.uid) || 'Member', body: reply.body, created_at: reply.createdAt.getTime(), isMine: viewer?._id === reply.uid, deleted: Boolean(reply.deleted), seenBy: serializeSeen(reply.seenBy, names), reactions: reactionSummary(reply.reactions, names, viewer), replies: (reply.replies || []).map(child => serializeReply(child, names, viewer)) };
 }
+function markRepliesSeen(replies, uid) { let changed = false; for (const reply of replies || []) { reply.seenBy ||= []; if (!reply.seenBy.includes(uid)) { reply.seenBy.push(uid); changed = true; } if (markRepliesSeen(reply.replies, uid)) changed = true; } return changed; }
+app.post('/api/fan-chat/:id/seen', signedIn, async (req, res) => {
+  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid message ID.' });
+  try {
+    const post = await FanChat.findOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true }, kind: { $ne: 'system' } });
+    if (!post) return res.status(404).json({ error: 'Message not found.' });
+    let changed = false; post.seenBy ||= [];
+    if (!post.seenBy.includes(req.user._id)) { post.seenBy.push(req.user._id); changed = true; }
+    if (markRepliesSeen(post.replies, req.user._id)) changed = true;
+    if (changed) await FanChat.updateOne({ _id: post._id }, { $set: { seenBy: post.seenBy, replies: post.replies || [] } });
+    res.json({ ok: true });
+  } catch (error) { console.error(error); res.status(500).json({ error: 'Could not mark this message as seen.' }); }
+});
 function findReply(replies, id) { for (const reply of replies) { if (reply.id === id) return reply; const nested = findReply(reply.replies || [], id); if (nested) return nested; } return null; }
 function appendChildReply(replies, parentId, child) { for (const reply of replies) { if (reply.id === parentId) { reply.replies ||= []; reply.replies.push(child); return true; } if (appendChildReply(reply.replies || [], parentId, child)) return true; } return false; }
 app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
@@ -306,7 +337,7 @@ async function updateReaction(req, res, target) {
   if (updated.length) bucket[emoji] = updated; else delete bucket[emoji];
   await FanChat.updateOne({ _id: post._id }, { $set: target === 'reply' ? { replies: post.replies } : { reactions: post.reactions } });
   const owner = target === 'reply' ? reply.uid : post.uid;
-  if (added && owner != null && owner !== req.user._id) await notify(owner, 'New reaction', `${req.user.name} reacted ${emoji} to your ${target === 'reply' ? 'reply' : 'message'}.`, 'chat-reaction', req.user._id);
+  if (added && owner != null && owner !== req.user._id) await notifyChatReaction(owner, 'New reaction', `${req.user.name} reacted ${emoji} to your ${target === 'reply' ? 'reply' : 'message'}.`, 'chat-reaction', req.user._id);
   res.json({ ok: true });
 }
 for (const target of ['message', 'reply']) {
