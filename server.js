@@ -127,6 +127,16 @@ async function notify(uid, title, body, tag = 'community', actorUid = null) {
   }
   } catch (error) { console.error('Could not create notification:', error.message); }
 }
+async function notifyFanChatMessage(uid, actorName, actorUid) {
+  try {
+    const now = new Date(), cooldown = new Date(now.getTime() - 5 * 60 * 1000);
+    const reserved = await Users.updateOne(
+      { _id: uid, notifications: true, $or: [{ lastFanChatPushAt: { $exists: false } }, { lastFanChatPushAt: { $lte: cooldown } }] },
+      { $set: { lastFanChatPushAt: now } },
+    );
+    if (reserved.modifiedCount) await notify(uid, 'New fan chat message', `${actorName} sent a message in the fan chat.`, 'fan-chat', actorUid);
+  } catch (error) { console.error('Could not send fan chat notification:', error.message); }
+}
 async function notifyChatReaction(uid, title, body, tag, actorUid) {
   try {
     const createdAt = new Date();
@@ -315,6 +325,7 @@ app.post('/api/fan-chat', signedIn, uploadFanMedia, async (req, res) => {
         mime: file.mimetype,
       })),
     });
+    for (const member of await Users.find({ _id: { $ne: req.user._id }, notifications: true }).project({ _id: 1 }).toArray()) await notifyFanChatMessage(member._id, req.user.name, req.user._id);
     res.status(201).json({ ok: true });
   } catch (error) {
     try {
