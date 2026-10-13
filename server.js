@@ -251,17 +251,17 @@ app.get('/api/fan-chat', async (req, res) => {
     const viewer = await userBySid(cookie(req, 'sid') || '');
     const posts = await FanChat.find({}).sort({ createdAt: -1, _id: -1 }).limit(100).toArray();
     const userIds = [...new Set(posts.flatMap(post => [post.uid, post.joinUid, ...collectReplyUserIds(post.replies || []), ...Object.values(post.reactions || {}).flatMap(users => users || []), ...(post.seenBy || []), ...collectReplySeenIds(post.replies || [])]).filter(id => id != null))];
-    const users = await Users.find({ _id: { $in: userIds } }).project({ name: 1 }).toArray();
-    const names = new Map(users.map(user => [user._id, user.name]));
+    const users = await Users.find({ _id: { $in: userIds } }).project({ name: 1, pub: 1 }).toArray();
+    const names = new Map(users.map(user => [user._id, { name: user.name, pub: user.pub }]));
     const messages = posts.reverse().flatMap(post => {
-      if (post.kind === 'system') return [{ id: post._id.toString(), system: true, body: names.has(post.joinUid) ? `${names.get(post.joinUid)} joined the fan community! Welcome 🎉` : post.body, created_at: post.createdAt.getTime(), reactions: reactionSummary(post.reactions, names, viewer) }];
+      if (post.kind === 'system') return [{ id: post._id.toString(), system: true, body: names.has(post.joinUid) ? `${names.get(post.joinUid).name} joined the fan community! Welcome 🎉` : post.body, created_at: post.createdAt.getTime(), reactions: reactionSummary(post.reactions, new Map([...names].map(([id, user]) => [id, user.name])), viewer) }];
       if (post.deleted) return [{ id: post._id.toString(), deleted: true, body: post.body, created_at: post.createdAt.getTime(), media: [], reactions: [], replies: [] }];
       if (!names.has(post.uid)) return [];
       return [{
-        id: post._id.toString(), uid: post.uid, isMine: viewer?._id === post.uid, name: names.get(post.uid), body: post.body, created_at: post.createdAt.getTime(),
+        id: post._id.toString(), uid: post.uid, isMine: viewer?._id === post.uid, name: names.get(post.uid).name, body: post.body, created_at: post.createdAt.getTime(),
         media: (post.media || []).map(file => ({ id: file.id, url: file.url, name: file.name, mime: file.mime })),
-        reactions: reactionSummary(post.reactions, names, viewer),
-        seenBy: serializeSeen(post.seenBy, names),
+        reactions: reactionSummary(post.reactions, new Map([...names].map(([id, user]) => [id, user.name])), viewer),
+        seenBy: serializeSeen(post.seenBy, names, post.uid),
         replies: (post.replies || []).map(reply => serializeReply(reply, names, viewer)),
       }];
     });
@@ -274,9 +274,10 @@ function reactionSummary(reactions = {}, names, viewer) {
 }
 function collectReplyUserIds(replies) { return replies.flatMap(reply => [reply.uid, ...Object.values(reply.reactions || {}).flatMap(users => users || []), ...collectReplyUserIds(reply.replies || [])]); }
 function collectReplySeenIds(replies) { return replies.flatMap(reply => [...(reply.seenBy || []), ...collectReplySeenIds(reply.replies || [])]); }
-function serializeSeen(ids = [], names) { return ids.map(uid => ({ id: String(uid), name: names.get(uid) || 'Member' })); }
+function serializeSeen(ids = [], names, ownerUid) { return ids.filter(uid => String(uid) !== String(ownerUid)).map(uid => { const user = names.get(uid); return user ? { id: user.pub || String(uid), name: user.name || 'Member' } : null; }).filter(Boolean); }
 function serializeReply(reply, names, viewer) {
-  return { id: reply.id, uid: reply.uid, name: names.get(reply.uid) || 'Member', body: reply.body, created_at: reply.createdAt.getTime(), isMine: viewer?._id === reply.uid, deleted: Boolean(reply.deleted), seenBy: serializeSeen(reply.seenBy, names), reactions: reactionSummary(reply.reactions, names, viewer), replies: (reply.replies || []).map(child => serializeReply(child, names, viewer)) };
+  const plainNames = new Map([...names].map(([id, user]) => [id, user.name]));
+  return { id: reply.id, uid: reply.uid, name: names.get(reply.uid)?.name || 'Member', body: reply.body, created_at: reply.createdAt.getTime(), isMine: viewer?._id === reply.uid, deleted: Boolean(reply.deleted), seenBy: serializeSeen(reply.seenBy, names, reply.uid), reactions: reactionSummary(reply.reactions, plainNames, viewer), replies: (reply.replies || []).map(child => serializeReply(child, names, viewer)) };
 }
 function markRepliesSeen(replies, uid) { let changed = false; for (const reply of replies || []) { reply.seenBy ||= []; if (!reply.seenBy.includes(uid)) { reply.seenBy.push(uid); changed = true; } if (markRepliesSeen(reply.replies, uid)) changed = true; } return changed; }
 app.post('/api/fan-chat/:id/seen', signedIn, async (req, res) => {

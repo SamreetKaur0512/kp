@@ -230,18 +230,18 @@ function makeReply(root,reply,depth,parentReplyId=null){const item=document.crea
 async function loadFanChat(force=false){
   try{
     const response=await fetch("/api/fan-chat");if(!response.ok)return;const data=await response.json(),box=$("fanMessages"),nearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<100,ids=new Set(data.messages.map(post=>String(post.id)));
-    const active=document.activeElement,activeForm=active?.closest?.(".reply-compose"),activeRoot=activeForm?.closest("[data-chat-id]"),activeId=activeRoot?.dataset.chatId,activeValue=active?.value,caretStart=active?.selectionStart,caretEnd=active?.selectionEnd;
+    const active=document.activeElement,activeForm=active?.closest?.(".reply-compose"),activeRoot=activeForm?.closest("[data-chat-id]"),activeId=activeRoot?.dataset.chatId,activeValue=active?.value,caretStart=active?.selectionStart,caretEnd=active?.selectionEnd,wasNearBottom=nearBottom;
     [...box.querySelectorAll("[data-chat-id]")].forEach(node=>{if(!ids.has(node.dataset.chatId))node.remove()});
     if(!data.messages.length&&!box.querySelector(".empty-chat")){const empty=document.createElement("div");empty.className="empty-chat";const title=document.createElement("strong");title.textContent="Room is warming up";empty.append(title,document.createTextNode("Start the conversation with the fans."));box.append(empty)}
     else if(data.messages.length)box.querySelector(".empty-chat")?.remove();
     data.messages.forEach(post=>{
       const existing=[...box.querySelectorAll("[data-chat-id]")].find(node=>node.dataset.chatId===post.id);
       if(existing){
-        const fresh=makeFanPost(post);if(existing.outerHTML!==fresh.outerHTML){if(activeForm&&activeId===post.id){const live=existing.querySelector(".reply-compose");if(live){const parent=live.parentElement,replyId=live.closest(".reply-item")?.dataset.replyId;let target;if(replyId)target=[...fresh.querySelectorAll(".reply-item")].find(item=>item.dataset.replyId===replyId);else target=fresh.querySelector(":scope .message-main");target?.append(live)}existing.replaceWith(fresh)}else existing.replaceWith(fresh)}
+        const fresh=makeFanPost(post);if(existing.outerHTML!==fresh.outerHTML){if(activeForm&&activeId===post.id){const live=existing.querySelector(".reply-compose"),oldTop=existing.getBoundingClientRect().top;if(live){const parent=live.parentElement,replyId=live.closest(".reply-item")?.dataset.replyId;let target;if(replyId)target=[...fresh.querySelectorAll(".reply-item")].find(item=>item.dataset.replyId===replyId);else target=fresh.querySelector(":scope .message-main");target?.append(live)}existing.replaceWith(fresh);const newRoot=[...box.querySelectorAll("[data-chat-id]")].find(node=>node.dataset.chatId===post.id);if(newRoot&&!wasNearBottom)box.scrollTop+=newRoot.getBoundingClientRect().top-oldTop}else existing.replaceWith(fresh)}
       }else box.append(makeFanPost(post));
     });
     if(activeForm&&active?.isConnected===false){const newRoot=[...box.querySelectorAll("[data-chat-id]")].find(node=>node.dataset.chatId===activeId),newInput=newRoot?.querySelector(".reply-compose input");if(newInput){newInput.value=activeValue;newInput.focus({preventScroll:true});if(Number.isInteger(caretStart))newInput.setSelectionRange(caretStart,caretEnd)}}
-    $("fanCount").textContent=`${data.members} fan${data.members===1?"":"s"} in the room`;if(nearBottom)box.scrollTop=box.scrollHeight;markVisibleSeen();
+    $("fanCount").textContent=`${data.members} fan${data.members===1?"":"s"} in the room`;if(wasNearBottom)box.scrollTop=box.scrollHeight;markVisibleSeen();
   }catch{$("fanStatus").textContent="Couldn't load the chat. Retrying..."}
 }
 let seenInFlight=new Set();
